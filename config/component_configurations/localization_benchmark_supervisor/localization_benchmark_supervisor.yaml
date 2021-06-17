@@ -1,0 +1,34 @@
+localization_benchmark_supervisor:
+  ros__parameters:
+
+    # run parameters
+    initial_pose_std_xy: 0.2
+    initial_pose_std_theta: 0.2617
+    goal_tolerance: 0.4
+    run_timeout: 10800.0
+    ps_snapshot_period: 10.0
+    write_estimated_poses_period: 0.1
+
+    # topic names
+    scan_topic: /scan
+    estimated_pose_correction_topic: /amcl_pose
+    ground_truth_pose_topic: /ground_truth/base_footprint/odom
+    initial_pose_topic: /initialpose
+    localization_node_transition_event_topic: /amcl/transition_event
+
+    # service names
+    lifecycle_manager_service: /lifecycle_manager/manage_nodes
+    global_costmap_get_parameters_service: /local_costmap/local_costmap/get_parameters
+    pause_physics_service: /pause_physics
+    unpause_physics_service: /unpause_physics
+    set_entity_state_service: /set_entity_state
+
+    # action names
+    navigate_to_pose_action: /follow_path
+
+    # frame names
+    fixed_frame: map
+    robot_base_frame: base_link_realistic
+
+    # gazebo entity names
+    robot_entity_name: robot  # base_footprint

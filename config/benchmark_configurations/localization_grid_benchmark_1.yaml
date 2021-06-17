@@ -1,0 +1,17 @@
+robots_dataset: ~/ds/performance_modelling/test_datasets/robots
+
+components_configurations_folder: ~/w/ros2_ws/src/localization_performance_modelling/config/component_configurations
+gazebo_model_path_env_var: [~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
+gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
+
+supervisor_component: localization_benchmark_supervisor
+
+components_configuration:
+  supervisor: localization_benchmark_supervisor/localization_benchmark_supervisor.yaml
+  nav2_amcl: nav2_amcl/nav2_amcl_1.yaml
+  nav2_navigation: nav2_navigation/nav2_navigation_1.yaml
+  rviz: rviz/nav2_default_view.rviz
+
+combinatorial_parameters:
+  robot_model: ['turtlebot3_waffle_performance_modelling', 'hunter2']
+  local_planner_node: ['teb', 'dwb']
