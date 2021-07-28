@@ -1,4 +1,4 @@
-localization_benchmark_supervisor:
+local_planning_benchmark_supervisor:
   ros__parameters:
 
     # run parameters
@@ -11,10 +11,11 @@ localization_benchmark_supervisor:
 
     # topic names
     scan_topic: /scan
+    cmd_vel_topic: /cmd_vel
     estimated_pose_correction_topic: /amcl_pose
     ground_truth_pose_topic: /ground_truth/base_footprint/odom
     initial_pose_topic: /initialpose
-    localization_node_transition_event_topic: /amcl/transition_event
+    #localization_node_transition_event_topic: /amcl/transition_event
 
     # service names
     lifecycle_manager_service: /lifecycle_manager/manage_nodes

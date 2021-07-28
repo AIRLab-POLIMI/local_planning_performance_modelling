@@ -8,7 +8,12 @@ import shutil
 import traceback
 
 import yaml
-from xml.etree import ElementTree as et
+
+
+import xml.etree.ElementTree as et
+from xml.etree.ElementTree import tostring
+
+
 import time
 from os import path
 import numpy as np
@@ -29,7 +34,8 @@ class BenchmarkRun(object):
         self.components_ros_output = 'screen' if show_ros_info else 'log'
         self.headless = headless
         self.use_sim_time = True
-
+        
+        
         # environment parameters
         robots_dataset_folder = path.expanduser(self.benchmark_configuration['robots_dataset'])
         print_info('robots_dataset_folder', robots_dataset_folder)
@@ -45,19 +51,20 @@ class BenchmarkRun(object):
             self.benchmark_configuration['gazebo_plugin_path_env_var']
         ))
 
-        robot_model = self.run_parameters['robot_model']
 
-     
+        robot_model = self.run_parameters['robot_model']
+        local_planner_node = self.run_parameters['local_planner_node']
+        global_planner_node = self.run_parameters['global_planner_node']
+        max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if robot_model == 'hunter2' else None
+
+
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
         elif robot_model == 'hunter2':
             robot_drive_plugin_type = 'ackermann_drive_plugin'
         else:
             raise ValueError()
-
-
-        local_planner_node = self.run_parameters['local_planner_node']
-
+            
         # run variables
         self.aborted = False
 
@@ -75,70 +82,93 @@ class BenchmarkRun(object):
         #original_nav2_amcl_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['nav2_amcl'])
         original_nav2_navigation_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['nav2_navigation'])
         self.original_rviz_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['rviz'])
+        original_local_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][local_planner_node])
+        original_global_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][global_planner_node])
         original_gazebo_world_model_path = path.join(environment_folder, "gazebo", "gazebo_environment.model")
         original_gazebo_robot_model_config_path = path.join(robots_dataset_folder, robot_model, "model.config")
-        print_info('original_gazebo_robot_model_config_path',original_gazebo_robot_model_config_path)
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
-        print_info('original_gazebo_robot_model_sdf_path',original_gazebo_robot_model_sdf_path)
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
-        print_info('original_robot_urdf_path',original_robot_urdf_path)
         
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
         #nav2_amcl_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['nav2_amcl'])
         nav2_navigation_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['nav2_navigation'])
-        #gazebo_world_model_relative_path = path.join("components_configuration", "/home/maria/ds/performance_modelling/test_datasets/gazebo_template/gazebo", "gazebo_environment.model")
+        local_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][local_planner_node])
+        global_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][global_planner_node])
         gazebo_world_model_relative_path = path.join("components_configuration", "gazebo", "gazebo_environment.model")
-        gazebo_robot_model_config_relative_path = path.join("components_configuration", "gazebo", "model.config")
-        gazebo_robot_model_sdf_relative_path = path.join("components_configuration", "gazebo", "model.sdf")
+        gazebo_robot_model_config_relative_path = path.join("components_configuration", "gazebo", "robot", "model.config")
+        gazebo_robot_model_sdf_relative_path = path.join("components_configuration", "gazebo", "robot", "model.sdf")
         #robot_gt_urdf_relative_path = path.join("components_configuration", "gazebo", "robot_gt.urdf")
-        robot_realistic_urdf_relative_path = path.join("components_configuration", "gazebo", "robot_realistic.urdf")
-    
+        robot_realistic_urdf_relative_path = path.join("components_configuration", "gazebo", "robot", "robot_realistic.urdf")
+
         # components configuration paths in run folder
         self.supervisor_configuration_path = path.join(self.run_output_folder, supervisor_configuration_relative_path)
         #self.nav2_amcl_configuration_path = path.join(self.run_output_folder, nav2_amcl_configuration_relative_path)
         self.nav2_navigation_configuration_path = path.join(self.run_output_folder, nav2_navigation_configuration_relative_path)
+        self.local_planner_configuration_path = path.join(self.run_output_folder, local_planner_configuration_relative_path)
+        self.global_planner_configuration_path = path.join(self.run_output_folder, global_planner_configuration_relative_path)
         self.gazebo_world_model_path = path.join(self.run_output_folder, gazebo_world_model_relative_path)
         gazebo_robot_model_config_path = path.join(self.run_output_folder, gazebo_robot_model_config_relative_path)
+        print_info('gazebo_robot_model_config_path', gazebo_robot_model_config_path)
         gazebo_robot_model_sdf_path = path.join(self.run_output_folder, gazebo_robot_model_sdf_relative_path)
+        print_info('gazebo_robot_model_sdf_path', gazebo_robot_model_sdf_path)
         #self.robot_gt_urdf_path = path.join(self.run_output_folder, robot_gt_urdf_relative_path)
         self.robot_realistic_urdf_path = path.join(self.run_output_folder, robot_realistic_urdf_relative_path)
+        print_info('robot_realistic_urdf_path',  self.robot_realistic_urdf_path)
 
         # copy the configuration of the supervisor to the run folder and update its parameters
         with open(original_supervisor_configuration_path) as supervisor_configuration_file:
             supervisor_configuration = yaml.safe_load(supervisor_configuration_file)
-        supervisor_configuration['localization_benchmark_supervisor']['ros__parameters']['run_output_folder'] = self.run_output_folder
-        supervisor_configuration['localization_benchmark_supervisor']['ros__parameters']['pid_father'] = os.getpid()
-        supervisor_configuration['localization_benchmark_supervisor']['ros__parameters']['use_sim_time'] = self.use_sim_time
-        supervisor_configuration['localization_benchmark_supervisor']['ros__parameters']['ground_truth_map_info_path'] = self.map_info_file_path
+        supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['run_output_folder'] = self.run_output_folder
+        supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['pid_father'] = os.getpid()
+        supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['use_sim_time'] = self.use_sim_time
+        supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['ground_truth_map_info_path'] = self.map_info_file_path
         if not path.exists(path.dirname(self.supervisor_configuration_path)):
             os.makedirs(path.dirname(self.supervisor_configuration_path))
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
+            
+        #if robot_model == 'hunter2':
+        # copy the configuration to the run folder and update its parameters
+        #NOT FINISHED-TO DO
+        #    with open(original_hunter2_configuration_path) as original_hunter2_configuration_file:
+        #        hunter2_configuration = yaml.safe_load(original_hunter2_configuration_file)
+        #elif robot_model == 'turtlebot3_waffle_performance_modelling':
+        #    with open(original_turtlebot3_waffle_performance_modelling_configuration_path) as original_turtlebot3_waffle_performance_modelling_configuration_file:
+        #        turtlebot3_waffle_performance_modelling_configuration = yaml.safe_load(original_turtlebot3_waffle_performance_modelling_configuration_file)
+        #else:
+        #   raise ValueError()
 
-        # copy the configuration of nav2_amcl to the run folder and update its parameters
-        # with open(original_nav2_amcl_configuration_path) as nav2_amcl_original_configuration_file:
-        #     nav2_amcl_configuration = yaml.safe_load(nav2_amcl_original_configuration_file)
-        # nav2_amcl_configuration['amcl']['ros__parameters']['alpha1'] = 2 * beta_1**2
-        # nav2_amcl_configuration['amcl']['ros__parameters']['alpha2'] = 2 * beta_2**2
-        # nav2_amcl_configuration['amcl']['ros__parameters']['alpha3'] = 2 * beta_3**2
-        # nav2_amcl_configuration['amcl']['ros__parameters']['alpha4'] = 2 * beta_4**2
-        # nav2_amcl_configuration['amcl']['ros__parameters']['laser_max_range'] = laser_scan_max_range
-        # if not path.exists(path.dirname(self.nav2_amcl_configuration_path)):
-        #     os.makedirs(path.dirname(self.nav2_amcl_configuration_path))
-        # with open(self.nav2_amcl_configuration_path, 'w') as nav2_amcl_configuration_file:
-        #     yaml.dump(nav2_amcl_configuration, nav2_amcl_configuration_file, default_flow_style=False)
 
-        # copy the configuration of nav2_navigation to the run folder
+        # copy the configuration of the nav2_navigation to the run folder and update its parameters
+        with open(original_nav2_navigation_configuration_path) as nav2_navigation_configuration_file:
+            nav2_navigation_configuration = yaml.safe_load(nav2_navigation_configuration_file)
+        nav2_navigation_configuration['map_server']['ros__parameters']['yaml_filename'] = self.map_info_file_path
         if not path.exists(path.dirname(self.nav2_navigation_configuration_path)):
             os.makedirs(path.dirname(self.nav2_navigation_configuration_path))
-        shutil.copyfile(original_nav2_navigation_configuration_path, self.nav2_navigation_configuration_path)
+        with open(self.nav2_navigation_configuration_path, 'w') as nav2_navigation_configuration_file:
+            yaml.dump(nav2_navigation_configuration, nav2_navigation_configuration_file, default_flow_style=False)
+
+        # copy the configuration of global_planner to the run folder
+        if not path.exists(path.dirname(self.global_planner_configuration_path)):
+            os.makedirs(path.dirname(self.global_planner_configuration_path))
+        shutil.copyfile(original_global_planner_configuration_path, self.global_planner_configuration_path)
+
+        # copy the configuration of local_planner to the run folder
+        with open(original_local_planner_configuration_path) as local_planner_configuration_file:
+            local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
+        if local_planner_node == 'teb' and robot_model == 'hunter2':
+            local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = 1.0
+        if not path.exists(path.dirname(self.local_planner_configuration_path)):
+            os.makedirs(path.dirname(self.local_planner_configuration_path))
+        with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
+            yaml.dump(local_planner_configuration, local_planner_configuration_file, default_flow_style=False)
 
         # copy the configuration of the gazebo world model to the run folder and update its parameters
         gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
         gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
 
-        print_info(path.dirname(gazebo_robot_model_sdf_relative_path))
+        #print_info('lol',path.dirname(gazebo_robot_model_sdf_relative_path))
 
         gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/uri")[0].text = path.join("model://", path.dirname(gazebo_robot_model_sdf_relative_path))
         if not path.exists(path.dirname(self.gazebo_world_model_path)):
@@ -148,21 +178,17 @@ class BenchmarkRun(object):
         # copy the configuration of the gazebo robot sdf model to the run folder and update its parameters
         gazebo_robot_model_sdf_tree = et.parse(original_gazebo_robot_model_sdf_path)
         gazebo_robot_model_sdf_root = gazebo_robot_model_sdf_tree.getroot()
-        #gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/ray/scan/horizontal/samples")[0].text = str(int(laser_scan_fov_deg))
-        #gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/ray/scan/horizontal/min_angle")[0].text = str(float(-laser_scan_fov_rad/2))
-        #gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/ray/scan/horizontal/max_angle")[0].text = str(float(+laser_scan_fov_rad/2))
-        #gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/ray/range/max")[0].text = str(float(laser_scan_max_range))
+        
+        #rough_string = tostring(gazebo_robot_model_sdf_root, 'utf-8', method="xml")
+        #print('asdfghjklç', rough_string)
+        
+        if robot_model == 'hunter2':
+            max_steering_rad = (max_steering_angle_deg/180.0) * np.pi
+
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frame_name")[0].text = "base_scan"
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/alpha1")[0].text = str(beta_1)
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/alpha2")[0].text = str(beta_2)
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/alpha3")[0].text = str(beta_3)
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/alpha4")[0].text = str(beta_4)
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/odometry_topic")[0].text = "odom_realistic"
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/odometry_frame")[0].text = "odom_realistic"
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/robot_base_frame")[0].text = "base_footprint_realistic"
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/ground_truth_parent_frame")[0].text = "odom"  # currently (Eloquent) odom is hardcoded in the navigation stack so it cannot be renamed for ground truth
-        #gazebo_robot_model_sdf_root.findall(".//plugin[@name='turtlebot3_diff_drive']/ground_truth_robot_base_frame")[0].text = "base_footprint_gt"
         gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "1"
+        if robot_model == 'hunter2':
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/max_steer")[0].text = str(max_steering_rad)
         if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
             os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
         gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
@@ -234,41 +260,52 @@ class BenchmarkRun(object):
             print_error(f"benchmark_log: could not write event to file: {t}, {self.run_id}, {event}")
             print_error(e)
 
+
     def execute_run(self):
+
+        
         print_info(self.gazebo_model_path_env_var)
-
-        launch_params = {
-            #'urdf': '/home/maria/ds/performance_modelling/test_datasets/dataset/airlab/gazebo/robot.urdf', 
-            #'world': '/home/maria/ds/performance_modelling/test_datasets/dataset/airlab/gazebo/gazebo_environment.model',
-            #'map':'/home/maria/ds/performance_modelling/test_datasets/dataset/airlab/data/map.yaml',
-            #'headless': True,
-            #'gazebo_model_path_env_var': '/home/maria/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models:/home/maria/ds/performance_modelling/test_datasets/dataset:/home/maria/ds/performance_modelling/test_datasets/robots:/home/maria/turtlebot3_simulations/turtlebot3_gazebo/models/:/home/maria/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models:/home/maria/ds/performance_modelling/test_datasets/dataset:/home/maria/ds/performance_modelling/test_datasets/robots:/home/maria/turtlebot3_simulations/turtlebot3_gazebo/models/',
-            #'gazebo_plugin_path_env_var': '',
-            'urdf': self.robot_realistic_urdf_path,
-            'world': self.gazebo_world_model_path,
-            'map': self.map_info_file_path,
-            'headless': True,
-            'gazebo_model_path_env_var': self.gazebo_model_path_env_var,
-            'gazebo_plugin_path_env_var': self.gazebo_plugin_path_env_var
-        }
-
 
         supervisor_params = {
             'configuration': self.supervisor_configuration_path,
             'use_sim_time': self.use_sim_time
         }
 
-        # declare components
-        #rviz = Component('rviz', 'localization_performance_modelling', 'rviz.launch.py', rviz_params)
-        # recorder = Component('recorder', 'localization_performance_modelling', 'rosbag_recorder.launch.py', recorder_params)
-        #print(environment_params)
-        #environment = Component('gazebo', 'localization_performance_modelling', 'gazebo.launch.py', environment_params)
-        #localization = Component('nav2_amcl', 'localization_performance_modelling', 'nav2_amcl.launch.py', localization_params)
-        #navigation = Component('nav2_navigation', 'localization_performance_modelling', 'nav2_navigation.launch.py', navigation_params)
-        supervisor = Component('supervisor', 'localization_performance_modelling', 'localization_benchmark_supervisor.launch.py', supervisor_params)
-        launch = Component('launch','localization_performance_modelling', 'all_simulation.launch.py', launch_params)
+        environment_params = {
+            'urdf': self.robot_realistic_urdf_path,
+            'world': self.gazebo_world_model_path,
+            'headless': True,
+            'gazebo_model_path_env_var': self.gazebo_model_path_env_var,
+            'gazebo_plugin_path_env_var': self.gazebo_plugin_path_env_var,
+            'params_file': self.nav2_navigation_configuration_path,
+            'rviz_config_file': self.original_rviz_configuration_path
+        }
 
-        # TODO manage launch exceptions in Component.__init__
+        navigation_params = {
+            'urdf': self.robot_realistic_urdf_path,
+            'world': self.gazebo_world_model_path,
+            'headless': True,
+            'gazebo_model_path_env_var': self.gazebo_model_path_env_var,
+            'gazebo_plugin_path_env_var': self.gazebo_plugin_path_env_var,
+            'params_file': self.nav2_navigation_configuration_path,
+            'rviz_config_file': self.original_rviz_configuration_path
+        }
+
+        local_planner_params = {
+            'params_file': self.local_planner_configuration_path
+        }
+
+        global_planner_params = {
+            'params_file': self.global_planner_configuration_path
+        }
+
+        # declare components
+        supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', supervisor_params)
+        environment = Component('launch','local_planning_performance_modelling', 'environment.launch.py', environment_params)
+        navigation = Component('launch','local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
+        local_planner = Component('launch','local_planning_performance_modelling', 'local_planner.launch.py', local_planner_params)
+        global_planner = Component('launch','local_planning_performance_modelling', 'global_planner.launch.py', global_planner_params)
+
 
         # add components to launcher
         components_launcher = ComponentsLauncher()
@@ -276,15 +313,14 @@ class BenchmarkRun(object):
         #     components_launcher.add_component(rviz)
         # components_launcher.add_component(rviz)
         # recorder.launch()
-        #components_launcher.add_component(environment)
-        #components_launcher.add_component(navigation)
-        #components_launcher.add_component(localization)
         components_launcher.add_component(supervisor)
-        components_launcher.add_component(launch)
+        components_launcher.add_component(environment)
+        components_launcher.add_component(navigation)
+        components_launcher.add_component(local_planner)
+        components_launcher.add_component(global_planner)
 
-
-        print(launch_params)
-
+        #print_info(launch_params)
+    
         # launch components and wait for the supervisor to finish
         self.log(event="waiting_supervisor_finish")
         components_launcher.launch()

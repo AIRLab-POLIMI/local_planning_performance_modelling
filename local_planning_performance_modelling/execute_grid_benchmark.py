@@ -7,7 +7,7 @@ import glob
 import argparse
 from os import path
 
-from localization_performance_modelling.localization_benchmark_run import BenchmarkRun
+from local_planning_performance_modelling.local_planning_benchmark_run import BenchmarkRun
 from performance_modelling_py.benchmark_execution.grid_benchmarking import execute_grid_benchmark
 
 
@@ -24,13 +24,13 @@ def main():
     parser.add_argument('-c', dest='grid_benchmark_configuration',
                         help='Yaml file with the configuration of the benchmark.',
                         type=str,
-                        default="~/w/ros2_ws/src/localization_performance_modelling/config/benchmark_configurations/localization_grid_benchmark_1.yaml",
+                        default="~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/grid_benchmark_1.yaml",
                         required=False)
 
     parser.add_argument('-r', dest='base_run_folder',
                         help='Folder in which the result of each run will be placed.',
                         type=str,
-                        default="~/ds/performance_modelling/output/test_localization/",
+                        default="~/ds/performance_modelling/output/test_local_planning/",
                         required=False)
 
     parser.add_argument('-n', '--num-runs', dest='num_runs',

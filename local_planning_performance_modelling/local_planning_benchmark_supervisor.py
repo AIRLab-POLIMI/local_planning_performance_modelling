@@ -56,7 +56,7 @@ def main(args=None):
 
     # noinspection PyBroadException
     try:
-        node = LocalizationBenchmarkSupervisor()
+        node = LocalPlanningBenchmarkSupervisor()
         node.start_run()
         rclpy.spin(node)
 
@@ -72,16 +72,18 @@ def main(args=None):
             node.end_run()
 
 
-class LocalizationBenchmarkSupervisor(Node):
+class LocalPlanningBenchmarkSupervisor(Node):
     def __init__(self):
-        super().__init__('localization_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
+        super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # topics, services, actions, entities and frames names
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
         initial_pose_topic = self.get_parameter('initial_pose_topic').value
-        localization_node_transition_event_topic = self.get_parameter('localization_node_transition_event_topic').value
+        #local_planning_node_transition_event_topic = self.get_parameter('local_planning_node_transition_event_topic').value
         lifecycle_manager_service = self.get_parameter('lifecycle_manager_service').value
         global_costmap_get_parameters_service = self.get_parameter('global_costmap_get_parameters_service').value
         pause_physics_service = self.get_parameter('pause_physics_service').value
@@ -117,7 +119,7 @@ class LocalizationBenchmarkSupervisor(Node):
         self.ps_snapshot_count = 0
         self.received_first_scan = False
         self.latest_ground_truth_pose_msg = None
-        self.localization_node_activated = False
+        self.local_planning_node_activated = False
         self.robot_radius = None
         self.initial_pose = None
         self.traversal_path_poses = None
@@ -172,10 +174,12 @@ class LocalizationBenchmarkSupervisor(Node):
         self.traversal_path_publisher = self.create_publisher(Path, "~/traversal_path", traversal_path_publisher_qos_profile)
 
         # setup subscribers
+        self.create_subscription(Twist, cmd_vel_topic, self.scan_callback, qos_profile_sensor_data)
+        
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
-        self.localization_node_transition_event_subscriber = self.create_subscription(TransitionEvent, localization_node_transition_event_topic, self.localization_node_transition_event_callback, qos_profile_sensor_data)
+        #self.local_planning_node_transition_event_subscriber = self.create_subscription(TransitionEvent, local_planning_node_transition_event_topic, self.local_planning_node_transition_event_callback, qos_profile_sensor_data)
 
         # setup action clients
         self.navigate_to_pose_action_client = ActionClient(self, FollowPath, navigate_to_pose_action)
@@ -183,6 +187,8 @@ class LocalizationBenchmarkSupervisor(Node):
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
+        return
+
         print_info("preparing to start run")
 
         # wait to receive sensor data from the environment (e.g., a simulator may need time to startup)
@@ -204,13 +210,18 @@ class LocalizationBenchmarkSupervisor(Node):
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
+
+        #Maria: not needed in our case, just a list of the vertices of the Voronoi graph
         minimum_length_paths = nx.all_pairs_dijkstra_path(voronoi_graph, weight='voronoi_path_distance')
         minimum_length_costs = dict(nx.all_pairs_dijkstra_path_length(voronoi_graph, weight='voronoi_path_distance'))
         costs = defaultdict(dict)
-        for i, paths_dict in minimum_length_paths:
-            for j in paths_dict.keys():
-                if i != j:
-                    costs[i][j] = minimum_length_costs[i][j]
+        # for i, paths_dict in minimum_length_paths:
+            # for j in paths_dict.keys():
+                # if i != j:
+                    # costs[i][j] = minimum_length_costs[i][j]
+
+        vertices_list = list(voronoi_graph.nodes)
+
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
@@ -326,6 +337,7 @@ class LocalizationBenchmarkSupervisor(Node):
 
         self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
         self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
+        #Maria: simple feedback callback (?)
         self.write_event(self.get_clock().now(), 'target_pose_set')
         print_info("goal_msg", goal_msg)
         self.goal_sent_count += 1
@@ -341,7 +353,7 @@ class LocalizationBenchmarkSupervisor(Node):
     def end_run(self):
         """
         This function is called after the run has completed, whether the run finished correctly, or there was an exception.
-        The only case in which this function is not called is if an exception was raised from LocalizationBenchmarkSupervisor.__init__
+        The only case in which this function is not called is if an exception was raised from LocalPlanningBenchmarkSupervisor.__init__
         """
         self.estimated_poses_df.to_csv(self.estimated_poses_file_path, index=False)
         self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
@@ -380,6 +392,8 @@ class LocalizationBenchmarkSupervisor(Node):
                 print_error("goal status succeeded but current position farther from goal position than tolerance")
                 self.write_event(self.get_clock().now(), 'target_pose_not_reached')
                 self.goal_failed_count += 1
+    
+    #Maria: we reach this line when the navigation stack was not able to navigate to the goal pose if p.e objects in the way or if the robot got stuck (close to a wall,...) or if there any exceptions or crash in the other nodes of the nav stack
         else:
             print_info('navigation action failed with status {}'.format(status))
             self.write_event(self.get_clock().now(), 'target_pose_not_reached')
@@ -388,20 +402,21 @@ class LocalizationBenchmarkSupervisor(Node):
         self.current_goal = None
 
         # if all goals have been sent end the run, otherwise send the next goal
+        #Maria: to test quickly to go only 1 pose change condition to go always to uncompleted (line 401)
         if len(self.traversal_path_poses) == 0:
             self.write_event(self.get_clock().now(), 'run_completed')
             rclpy.shutdown()
         else:
             self.send_goal()
 
-    def localization_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
+    def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time
-        if transition_event_msg.goal_state.label == 'active' and not self.localization_node_activated:
+        if transition_event_msg.goal_state.label == 'active' and not self.local_planning_node_activated:
             if self.initial_pose is None:
                 print_error("initial_pose is still None")
                 return
 
-            self.localization_node_activated = True
+            self.local_planning_node_activated = True
             self.initial_pose_publisher.publish(self.initial_pose)
             self.write_event(self.get_clock().now(), "initial_pose_set")
 

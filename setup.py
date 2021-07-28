@@ -2,7 +2,7 @@ import os
 from glob import glob
 from setuptools import setup
 
-package_name = 'localization_performance_modelling'
+package_name = 'local_planning_performance_modelling'
 
 setup(
     name=package_name,
@@ -24,8 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'localization_benchmark_supervisor = localization_performance_modelling.localization_benchmark_supervisor:main',
-            'execute_grid_benchmark = localization_performance_modelling.execute_grid_benchmark:main',
+            'local_planning_benchmark_supervisor = local_planning_performance_modelling.local_planning_benchmark_supervisor:main',
+            'execute_grid_benchmark = local_planning_performance_modelling.execute_grid_benchmark:main',
         ],
     },
 )

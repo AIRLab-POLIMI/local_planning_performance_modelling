@@ -1,0 +1,26 @@
+robots_dataset: ~/ds/performance_modelling/test_datasets/robots
+
+components_configurations_folder: ~/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations
+gazebo_model_path_env_var: [~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
+gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
+
+supervisor_component: local_planning_benchmark_supervisor
+
+components_configuration:
+  supervisor: local_planning_benchmark_supervisor/local_planning_benchmark_supervisor.yaml
+  nav2_amcl: nav2_amcl/nav2_amcl_1.yaml
+  nav2_navigation: nav2_navigation/nav2_navigation_1.yaml
+  #nav2_navigation: nav2_navigation/.yaml
+  #nav2_navigation: nav2_navigation/.yaml
+  #nav2_navigation: nav2_navigation/.yaml
+  #copy the ones with combinations to this folder and then in the script look at the comb. table we wil know which global planner use (using if, else, elif...) for above
+  rviz: rviz/nav2_default_view.rviz
+
+combinatorial_parameters: [
+  {
+    robot_model: [hunter2],
+    local_planner_node: [teb],
+    global_planner: [smac],
+    max_steering_angle: [50],
+  },
+]

@@ -9,7 +9,8 @@ git clone https://github.com/ROBOTIS-GIT/turtlebot3.git
 git clone https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
 git clone https://github.com/Enri2077/performance_modelling.git
 
-cd ~/w/ros2_ws/src/localization_performance_modelling
+#cd ~/w/ros2_ws/src/localization_performance_modelling
+cd ~/w/ros2_ws/src/local_planning_performance_modelling
 ./install_dependences.sh  # Installs dependencies with apt and pip
 
 cd ~/w/ros2_ws/src/performance_modelling

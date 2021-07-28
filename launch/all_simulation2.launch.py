@@ -86,7 +86,7 @@ def generate_launch_description():
 
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
-        default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
+        #default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
@@ -102,7 +102,10 @@ def generate_launch_description():
 
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config_file',
-        default_value='/home/maria/nav2_ws/src/local_planning_performance_modelling/params/rviz_test.rviz',
+        #default_value=os.path.join(
+            #get_package_share_directory('local_planning_performance_modelling'),
+            #'config', 'component_configurations', 'rviz', 'rviz_test.rviz'),
+        default_value= '/home/maria/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations/rviz/rviz_test.rviz',
         description='Full path to the RVIZ config file to use')
 
     declare_use_simulator_cmd = DeclareLaunchArgument(
@@ -134,17 +137,19 @@ def generate_launch_description():
         default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
         description='Full path to world model file to load')
 
-    declare_gazebo_cmd = DeclareLaunchArgument(
+    declare_gazebo_model_path_arg_cmd = DeclareLaunchArgument(
         'gazebo_model_path_env_var',
         description='GAZEBO_MODEL_PATH environment variable')
     
 
-    declare_plugin_path = DeclareLaunchArgument(
+    declare_gazebo_plugin_path_arg_cmd = DeclareLaunchArgument(
         'gazebo_plugin_path_env_var',
         description='GAZEBO_PLUGIN_PATH environment variable')
     
-    SetEnvironmentVariable('GAZEBO_MODEL_PATH', LaunchConfiguration('gazebo_model_path_env_var')),
-    SetEnvironmentVariable('GAZEBO_PLUGIN_PATH', LaunchConfiguration('gazebo_plugin_path_env_var')),
+    declare_gazebo_model_path_env_cmd = SetEnvironmentVariable('GAZEBO_MODEL_PATH', LaunchConfiguration('gazebo_model_path_env_var'))
+    
+    declare_gazebo_plugin_path_env_cmd = SetEnvironmentVariable('GAZEBO_PLUGIN_PATH', LaunchConfiguration('gazebo_plugin_path_env_var'))
+    
 
     # Specify the actions
     start_gazebo_server_cmd = ExecuteProcess(
@@ -169,7 +174,6 @@ def generate_launch_description():
     #urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
 
     start_robot_state_publisher_cmd = Node(
-        condition=IfCondition(use_robot_state_pub),
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
@@ -180,22 +184,22 @@ def generate_launch_description():
         arguments=[LaunchConfiguration('urdf')])
 
     rviz_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz_launch.py')),
+        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
         condition=IfCondition(use_rviz),
         launch_arguments={'namespace': '',
                           'use_namespace': 'False',
-                          'rviz_config': rviz_config_file}.items())
+                          'rviz_config_file': rviz_config_file}.items())
 
-    bringup_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'bringup_launch.py')),
-        launch_arguments={'namespace': namespace,
-                          'use_namespace': use_namespace,
-                          'slam': slam,
-                          'map': map_yaml_file,
-                          'use_sim_time': use_sim_time,
-                          'params_file': params_file,
-                          'default_bt_xml_filename': default_bt_xml_filename,
-                          'autostart': autostart}.items())
+    # bringup_cmd = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(os.path.join(launch_dir, 'bringup_launch.py')),
+    #     launch_arguments={'namespace': namespace,
+    #                       'use_namespace': use_namespace,
+    #                       'slam': slam,
+    #                       'map': map_yaml_file,
+    #                       'use_sim_time': use_sim_time,
+    #                       'params_file': params_file,
+    #                       'default_bt_xml_filename': default_bt_xml_filename,
+    #                       'autostart': autostart}.items())
 
     static_transformer_publisher_node = Node(
         package='tf2_ros',
@@ -226,9 +230,9 @@ def generate_launch_description():
     ld.add_action(declare_simulator_cmd)
     ld.add_action(declare_world_cmd)
 
-    ld.add_action(declare_gazebo_cmd)
-    ld.add_action(declare_plugin_path)
-
+    #ld.add_action(declare_gazebo_cmd)
+    #ld.add_action(declare_plugin_path)
+    
     # Add any conditioned actions
     ld.add_action(start_gazebo_server_cmd)
     ld.add_action(start_gazebo_client_cmd)
@@ -236,8 +240,14 @@ def generate_launch_description():
     # Add the actions to launch all of the navigation nodes
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(rviz_cmd)
-    ld.add_action(bringup_cmd)
+    #ld.add_action(bringup_cmd)
 
     ld.add_action(static_transformer_publisher_node)
+    
+    ld.add_action(declare_gazebo_model_path_arg_cmd)
+    ld.add_action(declare_gazebo_plugin_path_arg_cmd)
+    
+    ld.add_action(declare_gazebo_model_path_env_cmd)
+    ld.add_action(declare_gazebo_plugin_path_env_cmd)
 
     return ld
