@@ -92,7 +92,6 @@ def generate_launch_description():
             description='Whether to set the map subscriber QoS to transient local'),
             
 
-
         Node(
             package='nav2_recoveries',
             executable='recoveries_server',
@@ -124,6 +123,14 @@ def generate_launch_description():
             output='screen',
             parameters=[configured_params],
             remappings=remappings),
+        
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='gt_odom_static_transform_publisher',
+            output='log',
+            parameters=[{'use_sim_time': True}],
+            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 
         Node(
             package='nav2_lifecycle_manager',

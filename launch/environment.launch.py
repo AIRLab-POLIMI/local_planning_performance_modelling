@@ -194,13 +194,6 @@ def generate_launch_description():
     #                       'default_bt_xml_filename': default_bt_xml_filename,
     #                       'autostart': autostart}.items())
 
-    static_transformer_publisher_node = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='gt_odom_static_transform_publisher',
-        output='log',
-        parameters=[{'use_sim_time': True}],
-        arguments=["0", "0", "0", "0", "0", "0", "map", "odom"])
 
 
     # Create the launch description and populate
@@ -233,8 +226,6 @@ def generate_launch_description():
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(rviz_cmd)
     #ld.add_action(bringup_cmd)
-
-    ld.add_action(static_transformer_publisher_node)
     
     ld.add_action(declare_gazebo_model_path_arg_cmd)
     ld.add_action(declare_gazebo_plugin_path_arg_cmd)

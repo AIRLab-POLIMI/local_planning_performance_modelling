@@ -19,7 +19,8 @@ local_planning_benchmark_supervisor:
 
     # service names
     lifecycle_manager_service: /lifecycle_manager/manage_nodes
-    global_costmap_get_parameters_service: /local_costmap/local_costmap/get_parameters
+    local_costmap_get_parameters_service: /local_costmap/local_costmap/get_parameters
+    global_costmap_get_parameters_service: /global_costmap/global_costmap/get_parameters
     pause_physics_service: /pause_physics
     unpause_physics_service: /unpause_physics
     set_entity_state_service: /set_entity_state

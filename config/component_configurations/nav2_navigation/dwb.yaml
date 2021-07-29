@@ -14,12 +14,14 @@ controller_server:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
       movement_time_allowance: 10.0
+
     # Goal checker parameters
     goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
       stateful: True
+      
     # DWB parameters
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
