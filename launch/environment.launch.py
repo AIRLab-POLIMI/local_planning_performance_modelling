@@ -31,20 +31,9 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('local_planning_performance_modelling')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
-    # Create the launch configuration variables
-    slam = LaunchConfiguration('slam')
-    namespace = LaunchConfiguration('namespace')
-    use_namespace = LaunchConfiguration('use_namespace')
-    map_yaml_file = LaunchConfiguration('map')
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    params_file = LaunchConfiguration('params_file')
-    default_bt_xml_filename = LaunchConfiguration('default_bt_xml_filename')
-    autostart = LaunchConfiguration('autostart')
-
     # Launch configuration variables specific to simulation
     rviz_config_file = LaunchConfiguration('rviz_config_file')
     use_simulator = LaunchConfiguration('use_simulator')
-    use_robot_state_pub = LaunchConfiguration('use_robot_state_pub')
     use_rviz = LaunchConfiguration('use_rviz')
     headless = LaunchConfiguration('headless')
     world = LaunchConfiguration('world')
@@ -55,33 +44,15 @@ def generate_launch_description():
     # https://github.com/ros/robot_state_publisher/pull/30
     # TODO(orduno) Substitute with `PushNodeRemapping`
     #              https://github.com/ros2/launch_ros/issues/56
-    remappings = [('/tf', 'tf'),
-                  ('/tf_static', 'tf_static')]
 
-    # Declare the launch arguments
-    declare_namespace_cmd = DeclareLaunchArgument(
-        'namespace',
-        default_value='',
-        description='Top-level namespace')
-
-    declare_use_namespace_cmd = DeclareLaunchArgument(
-        'use_namespace',
-        default_value='false',
-        description='Whether to apply a namespace to the navigation stack')
 
     declare_slam_cmd = DeclareLaunchArgument(
         'slam',
         default_value='False',
         description='Whether run a SLAM')
 
-    declare_use_sim_time_cmd = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='true',
-        description='Use simulation (Gazebo) clock if true')
-
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
-        #default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
@@ -91,15 +62,8 @@ def generate_launch_description():
             'behavior_trees', 'navigate_w_replanning_and_recovery.xml'),
         description='Full path to the behavior tree xml file to use')
 
-    declare_autostart_cmd = DeclareLaunchArgument(
-        'autostart', default_value='true',
-        description='Automatically startup the nav2 stack')
-
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config_file',
-        #default_value=os.path.join(
-            #get_package_share_directory('local_planning_performance_modelling'),
-            #'config', 'component_configurations', 'rviz', 'rviz_test.rviz'),
         default_value= '/home/maria/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations/rviz/rviz_test.rviz',
         description='Full path to the RVIZ config file to use')
 
@@ -127,8 +91,6 @@ def generate_launch_description():
         'world',
         # TODO(orduno) Switch back once ROS argument passing has been fixed upstream
         #              https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/91
-        # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
-        #                            'worlds/turtlebot3_worlds/waffle.model'),
         default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
         description='Full path to world model file to load')
 
@@ -155,58 +117,26 @@ def generate_launch_description():
         cmd=['gzclient'],
         cwd=[launch_dir], output='screen')
         
-    urdf = DeclareLaunchArgument(
-        'urdf',
-        # TODO(orduno) Switch back once ROS argument passing has been fixed upstream
-        #              https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/91
-        # default_value=os.path.join(get_package_share_directory('turtlebot3_gazebo'),
-        #                            'worlds/turtlebot3_worlds/waffle.model'),
-        default_value=os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf'),
-        description='Full path to world model file to load')
-
-    #urdf = os.path.join(bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
 
     start_robot_state_publisher_cmd = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
-        namespace=namespace,
         output='screen',
-        parameters=[{'use_sim_time': use_sim_time}],
-        remappings=remappings,
         arguments=[LaunchConfiguration('urdf')])
 
     rviz_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
         condition=IfCondition(use_rviz),
-        launch_arguments={'namespace': '',
-                          'use_namespace': 'False',
-                          'rviz_config_file': rviz_config_file}.items())
-
-    # bringup_cmd = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(os.path.join(launch_dir, 'bringup_launch.py')),
-    #     launch_arguments={'namespace': namespace,
-    #                       'use_namespace': use_namespace,
-    #                       'slam': slam,
-    #                       'map': map_yaml_file,
-    #                       'use_sim_time': use_sim_time,
-    #                       'params_file': params_file,
-    #                       'default_bt_xml_filename': default_bt_xml_filename,
-    #                       'autostart': autostart}.items())
-
-
+        launch_arguments={'rviz_config_file': rviz_config_file}.items())
 
     # Create the launch description and populate
     ld = LaunchDescription()
 
     # Declare the launch options
-    ld.add_action(declare_namespace_cmd)
-    ld.add_action(declare_use_namespace_cmd)
     ld.add_action(declare_slam_cmd)
-    ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_bt_xml_cmd)
-    ld.add_action(declare_autostart_cmd)
 
     ld.add_action(declare_rviz_config_file_cmd)
     ld.add_action(declare_use_simulator_cmd)
@@ -214,9 +144,6 @@ def generate_launch_description():
     ld.add_action(declare_use_rviz_cmd)
     ld.add_action(declare_simulator_cmd)
     ld.add_action(declare_world_cmd)
-
-    #ld.add_action(declare_gazebo_cmd)
-    #ld.add_action(declare_plugin_path)
     
     # Add any conditioned actions
     ld.add_action(start_gazebo_server_cmd)
@@ -225,7 +152,6 @@ def generate_launch_description():
     # Add the actions to launch all of the navigation nodes
     ld.add_action(start_robot_state_publisher_cmd)
     ld.add_action(rviz_cmd)
-    #ld.add_action(bringup_cmd)
     
     ld.add_action(declare_gazebo_model_path_arg_cmd)
     ld.add_action(declare_gazebo_plugin_path_arg_cmd)

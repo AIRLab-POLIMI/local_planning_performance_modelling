@@ -3,12 +3,13 @@ planner_server:
     expected_planner_frequency: 20.0
     use_sim_time: True
     planner_plugins: ["GridBased"]
+
     #NavFn controller parameters 
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.5
-      use_astar: false
-      allow_unknown: true
+      use_astar: False
+      allow_unknown: True
       
 planner_server_rclcpp_node:
   ros__parameters:

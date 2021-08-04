@@ -3,6 +3,7 @@ planner_server:
     expected_planner_frequency: 20.0
     use_sim_time: True
     planner_plugins: ["GridBased"]
+    
     #Smac controller parameters 
     GridBased:
       plugin: "smac_planner/SmacPlanner"

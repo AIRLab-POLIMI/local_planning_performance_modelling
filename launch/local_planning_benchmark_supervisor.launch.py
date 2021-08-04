@@ -17,15 +17,12 @@ def generate_launch_description():
     )
     return LaunchDescription([
         # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
+        #SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
 
         DeclareLaunchArgument(
             'configuration',
             description='Configuration yaml file path'),
 
-        DeclareLaunchArgument(
-            'use_sim_time',
-            description='Use simulation/bag clock if true'),
 
         local_planning_benchmark_supervisor_node,
 

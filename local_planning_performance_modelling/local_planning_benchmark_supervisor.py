@@ -220,8 +220,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 # if i != j:
                     # costs[i][j] = minimum_length_costs[i][j]
 
-        vertices_list = list(voronoi_graph.nodes)
-
+        #Maria: list of the vertices
+        #vertices_list = list(voronoi_graph.nodes)
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))

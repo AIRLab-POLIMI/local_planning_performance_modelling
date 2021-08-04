@@ -35,7 +35,6 @@ class BenchmarkRun(object):
         self.headless = headless
         self.use_sim_time = True
         
-        
         # environment parameters
         robots_dataset_folder = path.expanduser(self.benchmark_configuration['robots_dataset'])
         print_info('robots_dataset_folder', robots_dataset_folder)
@@ -88,6 +87,8 @@ class BenchmarkRun(object):
         original_gazebo_robot_model_config_path = path.join(robots_dataset_folder, robot_model, "model.config")
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
+
+    
         
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])

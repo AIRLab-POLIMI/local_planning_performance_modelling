@@ -24,10 +24,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    declare_use_remappings_cmd = DeclareLaunchArgument(
-        'use_remappings', default_value='false',
-        description='Arguments to pass to all nodes launched by the file')
-
     declare_rviz_config_file_cmd = DeclareLaunchArgument(
         'rviz_config_file',
         description='Full path to the RVIZ config file to use')
@@ -37,21 +33,12 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         arguments=['-d', LaunchConfiguration('rviz_config_file')],
-        output='log',
-
-#        use_remappings=IfCondition(LaunchConfiguration('use_remappings')),
-        remappings=[('/tf', 'tf'),
-                    ('/tf_static', 'tf_static'),
-                    ('goal_pose', 'goal_pose'),
-                    ('/clicked_point', 'clicked_point'),
-                    ('/initialpose', 'initialpose')])
+        output='log')
 
     # Create the launch description and populate
     ld = LaunchDescription()
 
     # Declare the launch options
-    ld.add_action(declare_use_remappings_cmd)
-
     ld.add_action(declare_rviz_config_file_cmd)
 
     # Add any conditioned actions
