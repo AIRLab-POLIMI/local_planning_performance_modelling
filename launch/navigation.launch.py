@@ -100,7 +100,7 @@ def generate_launch_description():
             name='waypoint_follower',
             output='screen',
             parameters=[params_file]),
-        
+
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',

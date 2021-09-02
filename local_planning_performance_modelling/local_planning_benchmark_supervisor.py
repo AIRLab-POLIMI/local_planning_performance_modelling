@@ -220,7 +220,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 # if i != j:
                     # costs[i][j] = minimum_length_costs[i][j]
 
-        #Maria: list of the vertices
+        #Maria: list of the vertices, just random select one of this?
         #vertices_list = list(voronoi_graph.nodes)
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
