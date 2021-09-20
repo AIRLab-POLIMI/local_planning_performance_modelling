@@ -15,7 +15,8 @@ planner_server:
       max_on_approach_iterations: 1000  # maximum number of iterations to attempt to reach goal once in tolerance, 2D only
       max_planning_time_ms: 2000.0      # max time in ms for planner to plan, smooth, and upsample. Will scale maximum smoothing and upsampling times based on remaining time after planning.
       smooth_path: False                # Whether to smooth searched path
-      motion_model_for_search: "DUBIN"  # 2D Moore, Von Neumann; SE2 Dubin, Redds-Shepp
+      motion_model_for_search: "REEDS_SHEPP"  # 2D Moore, Von Neumann; SE2 Dubin, Redds-Shepp
+      #before it was dubin 
       angle_quantization_bins: 72       # For SE2 node: Number of angle bins for search, must be 1 for 2D node (no angle search)
       minimum_turning_radius: 0.20      # For SE2 node & smoother: minimum turning radius in m of path / vehicle
       reverse_penalty: 2.1              # For Reeds-Shepp model: penalty to apply if motion is reversing, must be => 1
@@ -64,13 +65,14 @@ local_costmap:
       origin_y: -1.5
       resolution: 0.05
       robot_radius: 0.22
+      #footprint: [ [0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1] ]
       inflation_layer:
         cost_scaling_factor: 3.0
       obstacle_layer:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan_gt
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -99,11 +101,12 @@ global_costmap:
       plugin_names: ["static_layer", "obstacle_layer", "inflation_layer"]
       plugin_types: ["nav2_costmap_2d::StaticLayer", "nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
       robot_radius: 0.22
+      #footprint: [ [0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1] ]
       obstacle_layer:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan_gt
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True

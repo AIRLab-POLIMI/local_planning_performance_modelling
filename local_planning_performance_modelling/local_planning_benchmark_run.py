@@ -88,8 +88,6 @@ class BenchmarkRun(object):
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
 
-    
-        
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
         #nav2_amcl_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['nav2_amcl'])
@@ -129,18 +127,6 @@ class BenchmarkRun(object):
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
             
-        #if robot_model == 'hunter2':
-        # copy the configuration to the run folder and update its parameters
-        #NOT FINISHED-TO DO
-        #    with open(original_hunter2_configuration_path) as original_hunter2_configuration_file:
-        #        hunter2_configuration = yaml.safe_load(original_hunter2_configuration_file)
-        #elif robot_model == 'turtlebot3_waffle_performance_modelling':
-        #    with open(original_turtlebot3_waffle_performance_modelling_configuration_path) as original_turtlebot3_waffle_performance_modelling_configuration_file:
-        #        turtlebot3_waffle_performance_modelling_configuration = yaml.safe_load(original_turtlebot3_waffle_performance_modelling_configuration_file)
-        #else:
-        #   raise ValueError()
-
-
         # copy the configuration of the nav2_navigation to the run folder and update its parameters
         with open(original_nav2_navigation_configuration_path) as nav2_navigation_configuration_file:
             nav2_navigation_configuration = yaml.safe_load(nav2_navigation_configuration_file)
@@ -151,19 +137,39 @@ class BenchmarkRun(object):
             yaml.dump(nav2_navigation_configuration, nav2_navigation_configuration_file, default_flow_style=False)
 
         # copy the configuration of global_planner to the run folder
-        if not path.exists(path.dirname(self.global_planner_configuration_path)):
-            os.makedirs(path.dirname(self.global_planner_configuration_path))
-        shutil.copyfile(original_global_planner_configuration_path, self.global_planner_configuration_path)
+        # if not path.exists(path.dirname(self.global_planner_configuration_path)):
+        #     os.makedirs(path.dirname(self.global_planner_configuration_path))
+        # shutil.copyfile(original_global_planner_configuration_path, self.global_planner_configuration_path)
 
         # copy the configuration of local_planner to the run folder
-        with open(original_local_planner_configuration_path) as local_planner_configuration_file:
-            local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
-        if local_planner_node == 'teb' and robot_model == 'hunter2':
-            local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = 1.0
+        # with open(original_local_planner_configuration_path) as local_planner_configuration_file:
+        #     local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
+        # if local_planner_node == 'teb' and robot_model == 'hunter2':
+        #     local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = 1.0
+        # if not path.exists(path.dirname(self.local_planner_configuration_path)):
+        #     os.makedirs(path.dirname(self.local_planner_configuration_path))
+        # with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
+        #     yaml.dump(local_planner_configuration, local_planner_configuration_file, default_flow_style=False)
+
+        # copy the configuration of global_planner to the run folder
+        with open(original_global_planner_configuration_path) as global_planner_configuration_file:
+            global_planner_configuration = yaml.safe_load(global_planner_configuration_file)
+        if local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '50':
+            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 0.55
+        elif local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '22':
+            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 1.61
+        else:
+            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 2.43
+        if not path.exists(path.dirname(self.global_planner_configuration_path)):
+            os.makedirs(path.dirname(self.global_planner_configuration_path))
+        with open(self.global_planner_configuration_path, 'w') as global_planner_configuration_file:
+            yaml.dump(global_planner_configuration, global_planner_configuration_file, default_flow_style=False)
+
+        # copy the configuration of local_planner to the run folder
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
             os.makedirs(path.dirname(self.local_planner_configuration_path))
-        with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
-            yaml.dump(local_planner_configuration, local_planner_configuration_file, default_flow_style=False)
+        shutil.copyfile(original_local_planner_configuration_path, self.local_planner_configuration_path)
+        
 
         # copy the configuration of the gazebo world model to the run folder and update its parameters
         gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)

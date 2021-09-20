@@ -18,12 +18,13 @@ from action_msgs.msg import GoalStatus
 from gazebo_msgs.msg import EntityState
 from gazebo_msgs.srv import SetEntityState
 from lifecycle_msgs.msg import TransitionEvent
-#from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import NavigateToPose
 from nav2_msgs.action import FollowPath
 from nav2_msgs.srv import ManageLifecycleNodes
 from nav_msgs.msg import Odometry, Path
 from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
+from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
@@ -77,7 +78,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # topics, services, actions, entities and frames names
-        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        #cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
@@ -122,7 +123,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.local_planning_node_activated = False
         self.robot_radius = None
         self.initial_pose = None
-        self.traversal_path_poses = None
         self.current_goal = None
         self.num_goals = None
         self.goal_sent_count = 0
@@ -151,7 +151,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
 
         # setup timers
-        #self.create_timer(run_timeout, self.run_timeout_callback)
+        self.create_timer(run_timeout, self.run_timeout_callback)
         self.create_timer(ps_snapshot_period, self.ps_snapshot_timer_callback)
         self.create_timer(write_estimated_poses_period, self.write_estimated_pose_timer_callback)
         # self.create_timer(1.0, self.test_timer_callback)
@@ -168,13 +168,13 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # setup publishers
-        self.initial_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, initial_pose_topic, 1)
+        self.initial_pose_publisher = self.create_publisher(PoseStamped, initial_pose_topic, 1)
         traversal_path_publisher_qos_profile = copy.copy(qos_profile_sensor_data)
         traversal_path_publisher_qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
         self.traversal_path_publisher = self.create_publisher(Path, "~/traversal_path", traversal_path_publisher_qos_profile)
 
         # setup subscribers
-        self.create_subscription(Twist, cmd_vel_topic, self.scan_callback, qos_profile_sensor_data)
+        #self.create_subscription(Twist, cmd_vel_topic, self.scan_callback, qos_profile_sensor_data)
         
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
@@ -182,12 +182,13 @@ class LocalPlanningBenchmarkSupervisor(Node):
         #self.local_planning_node_transition_event_subscriber = self.create_subscription(TransitionEvent, local_planning_node_transition_event_topic, self.local_planning_node_transition_event_callback, qos_profile_sensor_data)
 
         # setup action clients
-        self.navigate_to_pose_action_client = ActionClient(self, FollowPath, navigate_to_pose_action)
+        #self.navigate_to_pose_action_client = ActionClient(self, FollowPath, navigate_to_pose_action)
+        self.navigate_to_pose_action_client = ActionClient(self, NavigateToPose, navigate_to_pose_action)
         self.navigate_to_pose_action_goal_future = None
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
-        return
+        #return
 
         print_info("preparing to start run")
 
@@ -212,15 +213,14 @@ class LocalPlanningBenchmarkSupervisor(Node):
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
 
         #Maria: not needed in our case, just a list of the vertices of the Voronoi graph
-        minimum_length_paths = nx.all_pairs_dijkstra_path(voronoi_graph, weight='voronoi_path_distance')
-        minimum_length_costs = dict(nx.all_pairs_dijkstra_path_length(voronoi_graph, weight='voronoi_path_distance'))
-        costs = defaultdict(dict)
+        # minimum_length_paths = nx.all_pairs_dijkstra_path(voronoi_graph, weight='voronoi_path_distance')
+        # minimum_length_costs = dict(nx.all_pairs_dijkstra_path_length(voronoi_graph, weight='voronoi_path_distance'))
+        # costs = defaultdict(dict)
         # for i, paths_dict in minimum_length_paths:
-            # for j in paths_dict.keys():
-                # if i != j:
-                    # costs[i][j] = minimum_length_costs[i][j]
+        #     for j in paths_dict.keys():
+        #         if i != j:
+        #             costs[i][j] = minimum_length_costs[i][j]
 
-        #Maria: list of the vertices, just random select one of this?
         #vertices_list = list(voronoi_graph.nodes)
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
@@ -234,45 +234,50 @@ class LocalPlanningBenchmarkSupervisor(Node):
             raise RunFailException("insufficient number of nodes in deleaved_reduced_voronoi_graph, can not generate traversal path")
 
         # get greedy path traversing the whole graph starting from a random node
-        traversal_path_indices = list()
-        current_node = random.choice(list(voronoi_graph.nodes))
-        nodes_queue = set(nx.node_connected_component(voronoi_graph, current_node))
-        while len(nodes_queue):
-            candidates = list(filter(lambda node_cost: node_cost[0] in nodes_queue, costs[current_node].items()))
-            candidate_nodes, candidate_costs = zip(*candidates)
-            next_node = candidate_nodes[int(np.argmin(candidate_costs))]
-            traversal_path_indices.append(next_node)
-            current_node = next_node
-            nodes_queue.remove(next_node)
+        # traversal_path_indices = list()
+        # current_node = random.choice(list(voronoi_graph.nodes))
+        # nodes_queue = set(nx.node_connected_component(voronoi_graph, current_node))
+        # while len(nodes_queue):
+        #     candidates = list(filter(lambda node_cost: node_cost[0] in nodes_queue, costs[current_node].items()))
+        #     candidate_nodes, candidate_costs = zip(*candidates)
+        #     next_node = candidate_nodes[int(np.argmin(candidate_costs))]
+        #     traversal_path_indices.append(next_node)
+        #     current_node = next_node
+        #     nodes_queue.remove(next_node)
 
-        # convert path of nodes to list of poses (as deque so they can be popped)
-        self.traversal_path_poses = deque()
-        for node_index in traversal_path_indices:
-            pose = Pose()
-            pose.position.x, pose.position.y = voronoi_graph.nodes[node_index]['vertex']
-            q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-            pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
-            self.traversal_path_poses.append(pose)
+        #choose this as random
+        random_node_index = random.choice(list(voronoi_graph.nodes))
 
-        # publish the traversal path for visualization
-        traversal_path_msg = Path()
-        traversal_path_msg.header.frame_id = self.fixed_frame
-        traversal_path_msg.header.stamp = self.get_clock().now().to_msg()
-        for traversal_pose in self.traversal_path_poses:
-            traversal_pose_stamped = PoseStamped()
-            traversal_pose_stamped.header = traversal_path_msg.header
-            traversal_pose_stamped.pose = traversal_pose
-            traversal_path_msg.poses.append(traversal_pose_stamped)
-        self.traversal_path_publisher.publish(traversal_path_msg)
+        #MARIA: initial pose
+        pose = Pose()
+        pose.position.x, pose.position.y = voronoi_graph.nodes[random_node_index]['vertex']
+        q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
+        pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
 
-        # pop the first pose from traversal_path_poses and set it as initial pose
-        self.initial_pose = PoseWithCovarianceStamped()
-        self.initial_pose.header.frame_id = self.fixed_frame
-        self.initial_pose.header.stamp = self.get_clock().now().to_msg()
-        self.initial_pose.pose.pose = self.traversal_path_poses.popleft()
-        self.initial_pose.pose.covariance = list(self.initial_pose_covariance_matrix.flat)
+        #MARIA: navigate to pose has no path 
+        # path_msg = Path()
+        # path_msg.header.frame_id = self.fixed_frame
+        # path_msg.header.stamp = self.get_clock().now().to_msg()
+        # self.traversal_path_publisher.publish(path_msg)
+        
+        #MARIA: goal pose
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = "map"
+        goal_pose.header.stamp =  self.get_clock().now().to_msg()
+        goal_pose.pose = pose
+        #self.initial_pose_publisher.publish(goal_pose)
 
-        self.num_goals = len(self.traversal_path_poses)
+
+        print(pose)
+        print(goal_pose)
+
+        #MARIA: COMMENTED FROM HERE TO LINE 279
+        # pose_stamped = PoseStamped()
+        # pose_stamped.header.frame_id = "map"
+        # pose_stamped.header.stamp =  self.get_clock().now().to_msg()
+        # pose_stamped.pose = pose
+        # self.initial_pose_publisher.publish(pose_stamped)
+        
 
         # set the position of the robot in the simulator
 #       self.call_service(self.pause_physics_service_client, Empty.Request())
@@ -319,21 +324,24 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.write_event(self.get_clock().now(), 'failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
 
-        if len(self.traversal_path_poses) == 0:
-            self.write_event(self.get_clock().now(), 'insufficient_number_of_poses_in_traversal_path')
-            raise RunFailException("insufficient number of poses in traversal path, can not send goal")
 
-        goal_msg = FollowPath.Goal()
-        goal_msg.path.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.path.header.frame_id = self.fixed_frame
-        #goal_msg.path.poses = self.traversal_path_poses.popleft()
-        pose_stamped_message = PoseStamped()
-        pose_stamped_message.pose = self.traversal_path_poses.popleft()
-        pose_stamped_message.header.stamp = self.get_clock().now().to_msg()
-        pose_stamped_message.header.frame_id = self.fixed_frame
-        goal_msg.path.poses = [pose_stamped_message]
+        #goal_msg = FollowPath.Goal()
+        #goal_msg.path.header.stamp = self.get_clock().now().to_msg()
+        #goal_msg.path.header.frame_id = self.fixed_frame
+
+        #pose_stamped_message = PoseStamped()
+        #pose_stamped_message.pose = self.goal_pose
+        #pose_stamped_message.header.stamp = self.get_clock().now().to_msg()
+        # pose_stamped_message.header.frame_id = self.fixed_frame
+        # goal_msg.path.poses = [pose_stamped_message]
+        # self.current_goal = goal_msg
+
+        #MARIA
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg.pose.header.frame_id = self.fixed_frame
         self.current_goal = goal_msg
-    
+
 
         self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
         self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
@@ -401,13 +409,13 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         self.current_goal = None
 
-        # if all goals have been sent end the run, otherwise send the next goal
-        #Maria: to test quickly to go only 1 pose change condition to go always to uncompleted (line 401)
-        if len(self.traversal_path_poses) == 0:
-            self.write_event(self.get_clock().now(), 'run_completed')
-            rclpy.shutdown()
-        else:
-            self.send_goal()
+        #the goal has been sent and the navigation stack reached the goal, end the run
+        self.write_event(self.get_clock().now(), 'run_completed')
+
+        return
+
+        rclpy.shutdown()
+      
 
     def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time

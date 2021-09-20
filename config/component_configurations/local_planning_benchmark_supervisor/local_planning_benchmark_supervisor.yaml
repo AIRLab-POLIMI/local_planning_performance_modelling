@@ -26,7 +26,8 @@ local_planning_benchmark_supervisor:
     set_entity_state_service: /set_entity_state
 
     # action names
-    navigate_to_pose_action: /follow_path
+    #navigate_to_pose_action: /follow_path
+    navigate_to_pose_action: /navigate_to_pose
 
     # frame names
     fixed_frame: map

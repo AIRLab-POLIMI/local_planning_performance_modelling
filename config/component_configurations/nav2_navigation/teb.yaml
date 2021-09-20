@@ -1,6 +1,5 @@
 controller_server:
   ros__parameters:
-    # Controller server parameters 
     use_sim_time: True
     controller_frequency: 20.0
     min_x_velocity_threshold: 0.001
@@ -51,7 +50,6 @@ controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: True
 
-
 local_costmap:
   local_costmap:
     ros__parameters:
@@ -72,7 +70,7 @@ local_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan_gt
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -105,7 +103,7 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /scan_gt
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
