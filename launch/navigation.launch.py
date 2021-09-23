@@ -12,66 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-#from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
 
     params_file = LaunchConfiguration('params_file')
-    default_bt_xml_filename = LaunchConfiguration('default_bt_xml_filename')
-    map_subscribe_transient_local = LaunchConfiguration('map_subscribe_transient_local')
-
     lifecycle_nodes = ['recoveries_server',
                        'bt_navigator',
                        'waypoint_follower',
                        'map_server']
 
-    # Map fully qualified names to relative ones so the node's namespace can be prepended.
-    # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
-    # https://github.com/ros/geometry2/issues/32
-    # https://github.com/ros/robot_state_publisher/pull/30
-    # TODO(orduno) Substitute with `PushNodeRemapping`
-    #              https://github.com/ros2/launch_ros/issues/56
-
-
-    # Create our own temporary YAML files that include substitutions
-    # param_substitutions = {
-    #     'default_bt_xml_filename': default_bt_xml_filename,
-    #     'map_subscribe_transient_local': map_subscribe_transient_local}
-
-    # configured_params = RewrittenYaml(
-    #         source_file=params_file,
-    #         param_rewrites=param_substitutions,
-    #         convert_types=True)
-
     return LaunchDescription([
         # Set env var to print messages to stdout immediately
-        #SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
-        #SetEnvironmentVariable('RCUTILS_LOGGING_USE_STDOUT', '1'),
+        SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
 
         DeclareLaunchArgument(
             'params_file',
             description='Full path to the ROS2 parameters file to use'),
-
-        # DeclareLaunchArgument(
-        #     'default_bt_xml_filename',
-        #     default_value=os.path.join(
-        #         get_package_share_directory('nav2_bt_navigator'),
-        #         'behavior_trees', 'navigate_w_replanning_and_recovery.xml'),
-        #     description='Full path to the behavior tree xml file to use'),
-
-        # DeclareLaunchArgument(
-        #     'map_subscribe_transient_local', default_value='false',
-        #     description='Whether to set the map subscriber QoS to transient local'),
-            
 
         Node(
             package='nav2_recoveries',
@@ -79,7 +40,14 @@ def generate_launch_description():
             name='recoveries_server',
             output='screen',
             parameters=[params_file]),
-        
+
+        Node(
+            package='nav2_recoveries',
+            executable='recoveries_server',
+            name='recoveries_server',
+            output='screen',
+            parameters=[params_file]),
+
         Node(
             package='nav2_map_server',
             executable='map_server',
@@ -114,6 +82,6 @@ def generate_launch_description():
             name='lifecycle_manager_navigation_nav',
             output='screen',
             parameters=[{'node_names': lifecycle_nodes},
-            {'autostart':True}]),
+                        {'autostart': True}]),
 
     ])

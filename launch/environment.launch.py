@@ -31,132 +31,31 @@ def generate_launch_description():
     bringup_dir = get_package_share_directory('local_planning_performance_modelling')
     launch_dir = os.path.join(bringup_dir, 'launch')
 
-    # Launch configuration variables specific to simulation
-    rviz_config_file = LaunchConfiguration('rviz_config_file')
-    use_simulator = LaunchConfiguration('use_simulator')
-    use_rviz = LaunchConfiguration('use_rviz')
-    headless = LaunchConfiguration('headless')
-    world = LaunchConfiguration('world')
+    return LaunchDescription([
 
-    # Map fully qualified names to relative ones so the node's namespace can be prepended.
-    # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
-    # https://github.com/ros/geometry2/issues/32
-    # https://github.com/ros/robot_state_publisher/pull/30
-    # TODO(orduno) Substitute with `PushNodeRemapping`
-    #              https://github.com/ros2/launch_ros/issues/56
+        DeclareLaunchArgument('params_file', description='Full path to the ROS2 parameters file to use for all launched nodes'),
+        DeclareLaunchArgument('rviz_config_file', description='Full path to the RVIZ config file to use'),
+        DeclareLaunchArgument('headless', description='Whether to execute gzclient)'),
 
+        DeclareLaunchArgument('world', description='Full path to world model file to load'),
+        DeclareLaunchArgument('gazebo_model_path_env_var', description='GAZEBO_MODEL_PATH environment variable'),
+        DeclareLaunchArgument('gazebo_plugin_path_env_var', description='GAZEBO_PLUGIN_PATH environment variable'),
 
-    declare_slam_cmd = DeclareLaunchArgument(
-        'slam',
-        default_value='False',
-        description='Whether run a SLAM')
+        SetEnvironmentVariable('GAZEBO_MODEL_PATH', LaunchConfiguration('gazebo_model_path_env_var')),
+        SetEnvironmentVariable('GAZEBO_PLUGIN_PATH', LaunchConfiguration('gazebo_plugin_path_env_var')),
+        ExecuteProcess(cmd=['gzserver', '-s', 'libgazebo_ros_init.so', LaunchConfiguration('world'), '--verbose', '-s', 'libgazebo_ros_factory.so'], cwd=[launch_dir], output='screen'),
+        ExecuteProcess(cmd=['gzclient'], condition=IfCondition(PythonExpression(['not ', LaunchConfiguration('headless')])), cwd=[launch_dir], output='screen'),
 
-    declare_params_file_cmd = DeclareLaunchArgument(
-        'params_file',
-        description='Full path to the ROS2 parameters file to use for all launched nodes')
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            arguments=[LaunchConfiguration('urdf')]),
 
-    declare_bt_xml_cmd = DeclareLaunchArgument(
-        'default_bt_xml_filename',
-        default_value=os.path.join(
-            get_package_share_directory('nav2_bt_navigator'),
-            'behavior_trees', 'navigate_w_replanning_and_recovery.xml'),
-        description='Full path to the behavior tree xml file to use')
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
+            # condition=IfCondition(PythonExpression(['not ', headless])),  # TODO uncomment before running on server
+            launch_arguments={'rviz_config_file': LaunchConfiguration('rviz_config_file')}.items()),
 
-    declare_rviz_config_file_cmd = DeclareLaunchArgument(
-        'rviz_config_file',
-        default_value= '/home/maria/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations/rviz/rviz_test.rviz',
-        description='Full path to the RVIZ config file to use')
-
-    declare_use_simulator_cmd = DeclareLaunchArgument(
-        'use_simulator',
-        default_value='True',
-        description='Whether to start the simulator')
-
-    declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
-        'use_robot_state_pub',
-        default_value='True',
-        description='Whether to start the robot state publisher')
-
-    declare_use_rviz_cmd = DeclareLaunchArgument(
-        'use_rviz',
-        default_value='True',
-        description='Whether to start RVIZ')
-
-    declare_simulator_cmd = DeclareLaunchArgument(
-        'headless',
-        default_value='False',
-        description='Whether to execute gzclient)')
-
-    declare_world_cmd = DeclareLaunchArgument(
-        'world',
-        # TODO(orduno) Switch back once ROS argument passing has been fixed upstream
-        #              https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/91
-        default_value=os.path.join(bringup_dir, 'worlds', 'waffle.model'),
-        description='Full path to world model file to load')
-
-    declare_gazebo_model_path_arg_cmd = DeclareLaunchArgument(
-        'gazebo_model_path_env_var',
-        description='GAZEBO_MODEL_PATH environment variable')
-    
-    declare_gazebo_plugin_path_arg_cmd = DeclareLaunchArgument(
-        'gazebo_plugin_path_env_var',
-        description='GAZEBO_PLUGIN_PATH environment variable')
-    
-    declare_gazebo_model_path_env_cmd = SetEnvironmentVariable('GAZEBO_MODEL_PATH', LaunchConfiguration('gazebo_model_path_env_var'))
-    
-    declare_gazebo_plugin_path_env_cmd = SetEnvironmentVariable('GAZEBO_PLUGIN_PATH', LaunchConfiguration('gazebo_plugin_path_env_var'))
-    
-    # Specify the actions
-    start_gazebo_server_cmd = ExecuteProcess(
-        condition=IfCondition(use_simulator),
-        cmd=['gzserver', '-s', 'libgazebo_ros_init.so', world, '--verbose', '-s', 'libgazebo_ros_factory.so'],
-        cwd=[launch_dir], output='screen')
-
-    start_gazebo_client_cmd = ExecuteProcess(
-        condition=IfCondition(PythonExpression([use_simulator, ' and not ', headless])),
-        cmd=['gzclient'],
-        cwd=[launch_dir], output='screen')
-        
-
-    start_robot_state_publisher_cmd = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        arguments=[LaunchConfiguration('urdf')])
-
-    rviz_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
-        condition=IfCondition(use_rviz),
-        launch_arguments={'rviz_config_file': rviz_config_file}.items())
-
-    # Create the launch description and populate
-    ld = LaunchDescription()
-
-    # Declare the launch options
-    ld.add_action(declare_slam_cmd)
-    ld.add_action(declare_params_file_cmd)
-    ld.add_action(declare_bt_xml_cmd)
-
-    ld.add_action(declare_rviz_config_file_cmd)
-    ld.add_action(declare_use_simulator_cmd)
-    ld.add_action(declare_use_robot_state_pub_cmd)
-    ld.add_action(declare_use_rviz_cmd)
-    ld.add_action(declare_simulator_cmd)
-    ld.add_action(declare_world_cmd)
-    
-    # Add any conditioned actions
-    ld.add_action(start_gazebo_server_cmd)
-    ld.add_action(start_gazebo_client_cmd)
-
-    # Add the actions to launch all of the navigation nodes
-    ld.add_action(start_robot_state_publisher_cmd)
-    ld.add_action(rviz_cmd)
-    
-    ld.add_action(declare_gazebo_model_path_arg_cmd)
-    ld.add_action(declare_gazebo_plugin_path_arg_cmd)
-    
-    ld.add_action(declare_gazebo_model_path_env_cmd)
-    ld.add_action(declare_gazebo_plugin_path_env_cmd)
-
-    return ld
+    ])

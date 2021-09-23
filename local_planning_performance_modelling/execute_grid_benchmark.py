@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description='Execute the benchmark')
 
     parser.add_argument('-e', dest='environment_dataset_folders',
-                        help='Dataset folders containg the environment data. Use wildcards to select multiple folders. Only folders are selected, files are ignored.',
+                        help='Dataset folders containing the environment data. Use wildcards to select multiple folders. Only folders are selected, files are ignored.',
                         type=str,
                         default="~/ds/performance_modelling/test_datasets/dataset/*",
                         required=False)
@@ -24,7 +24,7 @@ def main():
     parser.add_argument('-c', dest='grid_benchmark_configuration',
                         help='Yaml file with the configuration of the benchmark.',
                         type=str,
-                        default="~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/grid_benchmark_1.yaml",
+                        default="~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/grid_benchmark_all.yaml",
                         required=False)
 
     parser.add_argument('-r', dest='base_run_folder',
@@ -37,7 +37,6 @@ def main():
                         help='Number of runs to be executed for each combination of configurations.',
                         type=int,
                         default=1,
-                        #default=10
                         required=False)
 
     parser.add_argument('--ignore-previous-runs', dest='ignore_previous_runs',
