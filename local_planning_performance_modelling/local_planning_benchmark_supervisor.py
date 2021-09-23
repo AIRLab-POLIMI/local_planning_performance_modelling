@@ -19,6 +19,7 @@ from nav2_msgs.srv import ManageLifecycleNodes
 from nav_msgs.msg import Odometry
 from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
+from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
@@ -72,7 +73,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # topics, services, actions, entities and frames names
-        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        #cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
@@ -292,9 +293,20 @@ class LocalPlanningBenchmarkSupervisor(Node):
         else:
             print_info('navigation action failed with status {}'.format(status))
             self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-
+            
         self.write_event(self.get_clock().now(), 'run_completed')
         rclpy.shutdown()
+
+    def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
+        # send the initial pose as soon as the localization node activates the first time
+        if transition_event_msg.goal_state.label == 'active' and not self.local_planning_node_activated:
+            if self.initial_pose is None:
+                print_error("initial_pose is still None")
+                return
+
+            self.local_planning_node_activated = True
+            self.initial_pose_publisher.publish(self.initial_pose)
+            self.write_event(self.get_clock().now(), "initial_pose_set")
 
     def run_timeout_callback(self):
         print_error("terminating supervisor due to timeout, terminating run")
