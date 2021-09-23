@@ -4,10 +4,8 @@
 import random
 import time
 import traceback
-from collections import defaultdict, deque
 
 import geometry_msgs
-import lifecycle_msgs
 import nav_msgs
 import networkx as nx
 import numpy as np
@@ -15,20 +13,17 @@ import pandas as pd
 import pyquaternion
 import rclpy
 from action_msgs.msg import GoalStatus
-from gazebo_msgs.msg import EntityState
 from gazebo_msgs.srv import SetEntityState
-from lifecycle_msgs.msg import TransitionEvent
 from nav2_msgs.action import NavigateToPose
-from nav2_msgs.action import FollowPath
 from nav2_msgs.srv import ManageLifecycleNodes
-from nav_msgs.msg import Odometry, Path
+from nav_msgs.msg import Odometry
 from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
 from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
-from rclpy.qos import qos_profile_sensor_data, QoSDurabilityPolicy
+from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
 
@@ -83,8 +78,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
-        initial_pose_topic = self.get_parameter('initial_pose_topic').value
-        #local_planning_node_transition_event_topic = self.get_parameter('local_planning_node_transition_event_topic').value
+        goal_pose_topic = self.get_parameter('goal_pose_topic').value
         lifecycle_manager_service = self.get_parameter('lifecycle_manager_service').value
         global_costmap_get_parameters_service = self.get_parameter('global_costmap_get_parameters_service').value
         pause_physics_service = self.get_parameter('pause_physics_service').value
@@ -102,6 +96,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ground_truth_map_info_path = self.get_parameter("ground_truth_map_info_path").value
 
         # run parameters
+        self.run_index = self.get_parameter('run_index').value
         run_timeout = self.get_parameter('run_timeout').value
         ps_snapshot_period = self.get_parameter('ps_snapshot_period').value
         write_estimated_poses_period = self.get_parameter('write_estimated_poses_period').value
@@ -122,13 +117,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.latest_ground_truth_pose_msg = None
         self.local_planning_node_activated = False
         self.robot_radius = None
-        self.initial_pose = None
-        self.current_goal = None
-        self.num_goals = None
-        self.goal_sent_count = 0
-        self.goal_succeeded_count = 0
-        self.goal_failed_count = 0
-        self.goal_rejected_count = 0
+        self.goal_pose = None
 
         # prepare folder structure
         if not path.exists(self.benchmark_data_folder):
@@ -154,7 +143,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.create_timer(run_timeout, self.run_timeout_callback)
         self.create_timer(ps_snapshot_period, self.ps_snapshot_timer_callback)
         self.create_timer(write_estimated_poses_period, self.write_estimated_pose_timer_callback)
-        # self.create_timer(1.0, self.test_timer_callback)
 
         # setup service clients
         self.lifecycle_manager_service_client = self.create_client(ManageLifecycleNodes, lifecycle_manager_service)
@@ -168,28 +156,19 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # setup publishers
-        self.initial_pose_publisher = self.create_publisher(PoseStamped, initial_pose_topic, 1)
-        traversal_path_publisher_qos_profile = copy.copy(qos_profile_sensor_data)
-        traversal_path_publisher_qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
-        self.traversal_path_publisher = self.create_publisher(Path, "~/traversal_path", traversal_path_publisher_qos_profile)
+        self.goal_pose_publisher = self.create_publisher(PoseStamped, goal_pose_topic, 1)
 
         # setup subscribers
-        #self.create_subscription(Twist, cmd_vel_topic, self.scan_callback, qos_profile_sensor_data)
-        
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
-        #self.local_planning_node_transition_event_subscriber = self.create_subscription(TransitionEvent, local_planning_node_transition_event_topic, self.local_planning_node_transition_event_callback, qos_profile_sensor_data)
 
         # setup action clients
-        #self.navigate_to_pose_action_client = ActionClient(self, FollowPath, navigate_to_pose_action)
         self.navigate_to_pose_action_client = ActionClient(self, NavigateToPose, navigate_to_pose_action)
         self.navigate_to_pose_action_goal_future = None
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
-        #return
-
         print_info("preparing to start run")
 
         # wait to receive sensor data from the environment (e.g., a simulator may need time to startup)
@@ -212,17 +191,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
 
-        #Maria: not needed in our case, just a list of the vertices of the Voronoi graph
-        # minimum_length_paths = nx.all_pairs_dijkstra_path(voronoi_graph, weight='voronoi_path_distance')
-        # minimum_length_costs = dict(nx.all_pairs_dijkstra_path_length(voronoi_graph, weight='voronoi_path_distance'))
-        # costs = defaultdict(dict)
-        # for i, paths_dict in minimum_length_paths:
-        #     for j in paths_dict.keys():
-        #         if i != j:
-        #             costs[i][j] = minimum_length_costs[i][j]
-
-        #vertices_list = list(voronoi_graph.nodes)
-
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
 
@@ -233,80 +201,24 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.write_event(self.get_clock().now(), 'insufficient_number_of_nodes_in_deleaved_reduced_voronoi_graph')
             raise RunFailException("insufficient number of nodes in deleaved_reduced_voronoi_graph, can not generate traversal path")
 
-        # get greedy path traversing the whole graph starting from a random node
-        # traversal_path_indices = list()
-        # current_node = random.choice(list(voronoi_graph.nodes))
-        # nodes_queue = set(nx.node_connected_component(voronoi_graph, current_node))
-        # while len(nodes_queue):
-        #     candidates = list(filter(lambda node_cost: node_cost[0] in nodes_queue, costs[current_node].items()))
-        #     candidate_nodes, candidate_costs = zip(*candidates)
-        #     next_node = candidate_nodes[int(np.argmin(candidate_costs))]
-        #     traversal_path_indices.append(next_node)
-        #     current_node = next_node
-        #     nodes_queue.remove(next_node)
+        # select the node from the run number
+        nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
+        print("voronoi_graph.nodes\n", voronoi_graph.nodes)
+        print("nil", nil)
 
-        #choose this as random
-        random_node_index = random.choice(list(voronoi_graph.nodes))
+        random.Random(0).shuffle(nil)
+        print("voronoi_graph.nodes\n", voronoi_graph.nodes)
+        print("nil\n", nil)
 
-        #MARIA: initial pose
-        pose = Pose()
-        pose.position.x, pose.position.y = voronoi_graph.nodes[random_node_index]['vertex']
+        # convert Voronoi node to pose
+        self.goal_pose = PoseStamped()
+        self.goal_pose.header.stamp = self.get_clock().now().to_msg()
+        self.goal_pose.header.frame_id = self.fixed_frame
+        self.goal_pose.pose = Pose()
+        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[nil[self.run_index % len(nil)]]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-        pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
-
-        #MARIA: navigate to pose has no path 
-        # path_msg = Path()
-        # path_msg.header.frame_id = self.fixed_frame
-        # path_msg.header.stamp = self.get_clock().now().to_msg()
-        # self.traversal_path_publisher.publish(path_msg)
-        
-        #MARIA: goal pose
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = "map"
-        goal_pose.header.stamp =  self.get_clock().now().to_msg()
-        goal_pose.pose = pose
-        #self.initial_pose_publisher.publish(goal_pose)
-
-
-        print(pose)
-        print(goal_pose)
-
-        #MARIA: COMMENTED FROM HERE TO LINE 279
-        # pose_stamped = PoseStamped()
-        # pose_stamped.header.frame_id = "map"
-        # pose_stamped.header.stamp =  self.get_clock().now().to_msg()
-        # pose_stamped.pose = pose
-        # self.initial_pose_publisher.publish(pose_stamped)
-        
-
-        # set the position of the robot in the simulator
-#       self.call_service(self.pause_physics_service_client, Empty.Request())
-#        print_info("called pause_physics_service")
-#        time.sleep(1.0)
-#
-#        robot_entity_state = EntityState(
-#            name=self.robot_entity_name,
-#            pose=self.initial_pose.pose.pose
-#        )
-#        set_entity_state_response = self.call_service(self.set_entity_state_service_client, SetEntityState.Request(state=robot_entity_state))
-#        if not set_entity_state_response.success:
-#            self.write_event(self.get_clock().now(), 'failed_to_set_entity_state')
-#            raise RunFailException("could not set robot entity state")
-#        print_info("called set_entity_state_service")
-#        time.sleep(1.0)
-#
-#        self.call_service(self.unpause_physics_service_client, Empty.Request())
-#        print_info("called unpause_physics_service")
-#        time.sleep(1.0)
-
-        # ask lifecycle_manager to startup all its managed nodes
-        # startup_request = ManageLifecycleNodes.Request(command=ManageLifecycleNodes.Request.STARTUP)
-        # startup_response: ManageLifecycleNodes.Response = self.call_service(self.lifecycle_manager_service_client, startup_request)
-        # if not startup_response.success:
-        #     self.write_event(self.get_clock().now(), 'failed_to_startup_nodes')
-        #     raise RunFailException("lifecycle manager could not startup nodes")
-
-        time.sleep(5.0)
+        self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
+        self.goal_pose_publisher.publish(self.goal_pose)
 
         self.write_event(self.get_clock().now(), 'run_start')
         self.run_started = True
@@ -314,8 +226,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.send_goal()
 
     def send_goal(self):
-        print_info(f"goal {self.goal_sent_count + 1} / {self.num_goals}")
-
         print_info("waiting")
         time.sleep(5.0)
         print_info("finished waiting")
@@ -324,31 +234,14 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.write_event(self.get_clock().now(), 'failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
 
-
-        #goal_msg = FollowPath.Goal()
-        #goal_msg.path.header.stamp = self.get_clock().now().to_msg()
-        #goal_msg.path.header.frame_id = self.fixed_frame
-
-        #pose_stamped_message = PoseStamped()
-        #pose_stamped_message.pose = self.goal_pose
-        #pose_stamped_message.header.stamp = self.get_clock().now().to_msg()
-        # pose_stamped_message.header.frame_id = self.fixed_frame
-        # goal_msg.path.poses = [pose_stamped_message]
-        # self.current_goal = goal_msg
-
-        #MARIA
         goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = self.goal_pose
         goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.pose.header.frame_id = self.fixed_frame
-        self.current_goal = goal_msg
-
 
         self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
         self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
-        #Maria: simple feedback callback (?)
         self.write_event(self.get_clock().now(), 'target_pose_set')
         print_info("goal_msg", goal_msg)
-        self.goal_sent_count += 1
 
     def ros_shutdown_callback(self):
         """
@@ -375,9 +268,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         if not goal_handle.accepted:
             print_error('navigation action goal rejected')
             self.write_event(self.get_clock().now(), 'target_pose_rejected')
-            self.goal_rejected_count += 1
-            self.current_goal = None
-            self.send_goal()
+            rclpy.shutdown()
             return
 
         self.write_event(self.get_clock().now(), 'target_pose_accepted')
@@ -390,32 +281,21 @@ class LocalPlanningBenchmarkSupervisor(Node):
         print_info("status", status)
 
         if status == GoalStatus.STATUS_SUCCEEDED:
-            goal_position = self.current_goal.pose.pose.position
+            goal_position = self.goal_pose.pose.position
             current_position = self.latest_ground_truth_pose_msg.pose.pose.position
             distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
             if distance_from_goal < self.goal_tolerance:
                 self.write_event(self.get_clock().now(), 'target_pose_reached')
-                self.goal_succeeded_count += 1
             else:
                 print_error("goal status succeeded but current position farther from goal position than tolerance")
                 self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-                self.goal_failed_count += 1
-    
-    #Maria: we reach this line when the navigation stack was not able to navigate to the goal pose if p.e objects in the way or if the robot got stuck (close to a wall,...) or if there any exceptions or crash in the other nodes of the nav stack
+
         else:
             print_info('navigation action failed with status {}'.format(status))
             self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-            self.goal_failed_count += 1
-
-        self.current_goal = None
-
-        #the goal has been sent and the navigation stack reached the goal, end the run
+            
         self.write_event(self.get_clock().now(), 'run_completed')
-
-        return
-
         rclpy.shutdown()
-      
 
     def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time
@@ -428,14 +308,11 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.initial_pose_publisher.publish(self.initial_pose)
             self.write_event(self.get_clock().now(), "initial_pose_set")
 
-    # def test_timer_callback(self):
-    #     print_info("test_timer_callback")
-
     def run_timeout_callback(self):
         print_error("terminating supervisor due to timeout, terminating run")
         self.write_event(self.get_clock().now(), 'run_timeout')
         self.write_event(self.get_clock().now(), 'supervisor_finished')
-        raise RunFailException("timeout")
+        rclpy.shutdown()
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True

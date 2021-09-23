@@ -105,36 +105,3 @@ local_costmap:
   local_costmap_rclcpp_node:
     ros__parameters:
       use_sim_time: True
-
-global_costmap:
-  global_costmap:
-    ros__parameters:
-      map_topic: /map
-      width: 100
-      height: 100
-      origin_x: -50.0
-      origin_y: -50.0
-      use_sim_time: True
-      plugin_names: ["static_layer", "obstacle_layer", "inflation_layer"]
-      plugin_types: ["nav2_costmap_2d::StaticLayer", "nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
-      robot_radius: 0.22
-      obstacle_layer:
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-      static_layer:
-        map_subscribe_transient_local: True
-      always_send_full_costmap: True
-
-  global_costmap_client:
-    ros__parameters:
-      use_sim_time: True
-
-  global_costmap_rclcpp_node:
-    ros__parameters:
-      use_sim_time: True

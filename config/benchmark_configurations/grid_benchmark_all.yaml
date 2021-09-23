@@ -22,10 +22,12 @@ combinatorial_parameters: [
     local_planner_node: [teb],
     global_planner_node: [smac],
     max_steering_angle_deg: [15,22,50],
+    run_index: [0, 1, 2]
   },
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
     local_planner_node: [dwb, teb],
     global_planner_node: [navfn],
+    run_index: [0, 1, 2],
   },
 ]

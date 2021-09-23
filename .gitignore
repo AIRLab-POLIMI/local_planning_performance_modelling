@@ -1,3 +1,5 @@
 local_planning_performance_modelling/__pycache__
 launch/__pycache__/
 **.rviz
+.idea
+local_planning_performance_modelling.egg-info
