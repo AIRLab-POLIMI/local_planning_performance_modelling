@@ -15,33 +15,35 @@
 """This is all-in-one launch script intended for use by nav2 developers."""
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument)
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
-
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
 
-    declare_rviz_config_file_cmd = DeclareLaunchArgument(
-        'rviz_config_file',
-        description='Full path to the RVIZ config file to use')
-
-    start_rviz_cmd = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        arguments=['-d', LaunchConfiguration('rviz_config_file')],
-        output='log')
-
     # Create the launch description and populate
-    ld = LaunchDescription()
+    ld = LaunchDescription([
 
-    # Declare the launch options
-    ld.add_action(declare_rviz_config_file_cmd)
+        # Set env var to print messages to stdout immediately and with color
+        SetEnvironmentVariable(
+            name='RCUTILS_LOGGING_BUFFERED_STREAM',
+            value='1'),
+        SetEnvironmentVariable(
+            name='RCUTILS_COLORIZED_OUTPUT',
+            value='1'),
 
-    # Add any conditioned actions
-    ld.add_action(start_rviz_cmd)
+        DeclareLaunchArgument(
+            'rviz_config_file',
+            description='Full path to the RVIZ config file to use'),
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', LaunchConfiguration('rviz_config_file')],
+            output='log'),
+
+    ])
 
     return ld

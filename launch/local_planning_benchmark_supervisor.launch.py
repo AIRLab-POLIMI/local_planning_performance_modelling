@@ -15,17 +15,22 @@ def generate_launch_description():
         emulate_tty=True,
         parameters=[LaunchConfiguration('configuration')],
     )
+
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        #SetEnvironmentVariable('RCUTILS_CONSOLE_STDOUT_LINE_BUFFERED', '1'),
+
+        # Set env var to print messages to stdout immediately and with color
+        SetEnvironmentVariable(
+            name='RCUTILS_LOGGING_BUFFERED_STREAM',
+            value='1'),
+        SetEnvironmentVariable(
+            name='RCUTILS_COLORIZED_OUTPUT',
+            value='1'),
 
         DeclareLaunchArgument(
             'configuration',
             description='Configuration yaml file path'),
 
-
         local_planning_benchmark_supervisor_node,
-
 
         RegisterEventHandler(
             event_handler=OnProcessExit(

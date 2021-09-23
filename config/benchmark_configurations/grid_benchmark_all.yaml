@@ -6,6 +6,8 @@ gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
 
 supervisor_component: local_planning_benchmark_supervisor
 
+hunter2_wheelbase: 0.65
+
 components_configuration:
   supervisor: local_planning_benchmark_supervisor/local_planning_benchmark_supervisor.yaml
   nav2_amcl: nav2_amcl/nav2_amcl_1.yaml

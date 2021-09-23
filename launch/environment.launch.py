@@ -33,6 +33,14 @@ def generate_launch_description():
 
     return LaunchDescription([
 
+        # Set env var to print messages to stdout immediately and with color
+        SetEnvironmentVariable(
+            name='RCUTILS_LOGGING_BUFFERED_STREAM',
+            value='1'),
+        SetEnvironmentVariable(
+            name='RCUTILS_COLORIZED_OUTPUT',
+            value='1'),
+
         DeclareLaunchArgument('params_file', description='Full path to the ROS2 parameters file to use for all launched nodes'),
         DeclareLaunchArgument('rviz_config_file', description='Full path to the RVIZ config file to use'),
         DeclareLaunchArgument('headless', description='Whether to execute gzclient)'),

@@ -1,18 +1,12 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-
 import os
 import shutil
-import traceback
 
 import yaml
 
-
 import xml.etree.ElementTree as et
-from xml.etree.ElementTree import tostring
-
 
 import time
 from os import path
@@ -37,7 +31,6 @@ class BenchmarkRun(object):
         
         # environment parameters
         robots_dataset_folder = path.expanduser(self.benchmark_configuration['robots_dataset'])
-        print_info('robots_dataset_folder', robots_dataset_folder)
 
         self.environment_folder = environment_folder
         self.map_info_file_path = path.join(environment_folder, "data", "map.yaml")
@@ -55,6 +48,8 @@ class BenchmarkRun(object):
         global_planner_node = self.run_parameters['global_planner_node']
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if robot_model == 'hunter2' else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if robot_model == 'hunter2' else None
+        wheelbase = self.benchmark_configuration['hunter2_wheelbase'] if robot_model == 'hunter2' else None
+        min_turning_radius = wheelbase/np.tan(max_steering_rad) if robot_model == 'hunter2' else None
         self.run_index = self.run_parameters['run_index']
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
@@ -103,11 +98,8 @@ class BenchmarkRun(object):
         self.global_planner_configuration_path = path.join(self.run_output_folder, global_planner_configuration_relative_path)
         self.gazebo_world_model_path = path.join(self.run_output_folder, gazebo_world_model_relative_path)
         gazebo_robot_model_config_path = path.join(self.run_output_folder, gazebo_robot_model_config_relative_path)
-        print_info('gazebo_robot_model_config_path', gazebo_robot_model_config_path)
         gazebo_robot_model_sdf_path = path.join(self.run_output_folder, gazebo_robot_model_sdf_relative_path)
-        print_info('gazebo_robot_model_sdf_path', gazebo_robot_model_sdf_path)
         self.robot_realistic_urdf_path = path.join(self.run_output_folder, robot_realistic_urdf_relative_path)
-        print_info('robot_realistic_urdf_path',  self.robot_realistic_urdf_path)
 
         # copy the configuration of the supervisor to the run folder and update its parameters
         with open(original_supervisor_configuration_path) as supervisor_configuration_file:
@@ -132,29 +124,10 @@ class BenchmarkRun(object):
             yaml.dump(nav2_navigation_configuration, nav2_navigation_configuration_file, default_flow_style=False)
 
         # copy the configuration of global_planner to the run folder
-        # if not path.exists(path.dirname(self.global_planner_configuration_path)):
-        #     os.makedirs(path.dirname(self.global_planner_configuration_path))
-        # shutil.copyfile(original_global_planner_configuration_path, self.global_planner_configuration_path)
-
-        # copy the configuration of local_planner to the run folder
-        # with open(original_local_planner_configuration_path) as local_planner_configuration_file:
-        #     local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
-        # if local_planner_node == 'teb' and robot_model == 'hunter2':
-        #     local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = 1.0
-        # if not path.exists(path.dirname(self.local_planner_configuration_path)):
-        #     os.makedirs(path.dirname(self.local_planner_configuration_path))
-        # with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
-        #     yaml.dump(local_planner_configuration, local_planner_configuration_file, default_flow_style=False)
-
-        # copy the configuration of global_planner to the run folder
         with open(original_global_planner_configuration_path) as global_planner_configuration_file:
             global_planner_configuration = yaml.safe_load(global_planner_configuration_file)
-        if local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '50':
-            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 0.55
-        elif local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '22':
-            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 1.61
-        else:
-            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 2.43
+        if local_planner_node == 'teb' and robot_model == 'hunter2':
+            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = min_turning_radius
         if not path.exists(path.dirname(self.global_planner_configuration_path)):
             os.makedirs(path.dirname(self.global_planner_configuration_path))
         with open(self.global_planner_configuration_path, 'w') as global_planner_configuration_file:
@@ -164,7 +137,6 @@ class BenchmarkRun(object):
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
             os.makedirs(path.dirname(self.local_planner_configuration_path))
         shutil.copyfile(original_local_planner_configuration_path, self.local_planner_configuration_path)
-        
 
         # copy the configuration of the gazebo world model to the run folder and update its parameters
         gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
@@ -179,7 +151,6 @@ class BenchmarkRun(object):
         gazebo_robot_model_sdf_tree = et.parse(original_gazebo_robot_model_sdf_path)
         gazebo_robot_model_sdf_root = gazebo_robot_model_sdf_tree.getroot()
 
-
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frame_name")[0].text = "base_scan"
         gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "1"
         if robot_model == 'hunter2':
@@ -193,28 +164,8 @@ class BenchmarkRun(object):
             os.makedirs(path.dirname(gazebo_robot_model_config_path))
         shutil.copyfile(original_gazebo_robot_model_config_path, gazebo_robot_model_config_path)
 
-        # copy the configuration of the robot urdf to the run folder and update the link names for ground truth data
-        #robot_gt_urdf_tree = et.parse(original_robot_urdf_path)
-        #robot_gt_urdf_root = robot_gt_urdf_tree.getroot()
-        #for link_element in robot_gt_urdf_root.findall(".//link"):
-        #     if link_element.attrib['name'] == "base_link":  # currently (Eloquent) base_link is hardcoded in the navigation stack so it cannot be renamed
-        #         continue
-        #     link_el #print(navigation_params)ement.attrib['name'] = "{}_gt".format(link_element.attrib['name'])
-        # for joint_link_element in robot_gt_urdf_root.findall(".//*[@link]"):
-        #     if joint_link_element.attrib['link'] == "base_link":  # currently (Eloquent) base_link is hardcoded in the navigation stack so it cannot be renamed
-        #         continue
-        #     joint_link_element.attrib['link'] = "{}_gt".format(joint_link_element.attrib['link'])
-        # if not path.exists(path.dirname(self.robot_gt_urdf_path)):
-        #     os.makedirs(path.dirname(self.robot_gt_urdf_path))
-        # robot_gt_urdf_tree.write(self.robot_gt_urdf_path)
-
         # copy the configuration of the robot urdf to the run folder and update the link names for realistic data
         robot_realistic_urdf_tree = et.parse(original_robot_urdf_path)
-        robot_realistic_urdf_root = robot_realistic_urdf_tree.getroot()
-        # for link_element in robot_realistic_urdf_root.findall(".//link"):
-        #     link_element.attrib['name'] = "{}_realistic".format(link_element.attrib['name'])
-        # for joint_link_element in robot_realistic_urdf_root.findall(".//*[@link]"):
-        #     joint_link_element.attrib['link'] = "{}_realistic".format(joint_link_element.attrib['link'])
         if not path.exists(path.dirname(self.robot_realistic_urdf_path)):
             os.makedirs(path.dirname(self.robot_realistic_urdf_path))
         robot_realistic_urdf_tree.write(self.robot_realistic_urdf_path)
@@ -227,7 +178,7 @@ class BenchmarkRun(object):
         run_info_dict["run_parameters"] = self.run_parameters
         run_info_dict["local_components_configuration"] = {
             'supervisor': supervisor_configuration_relative_path,
-            #'nav2_amcl': nav2_amcl_configuration_relative_path,
+            # 'nav2_amcl': nav2_amcl_configuration_relative_path,
             'nav2_navigation': nav2_navigation_configuration_relative_path,
             'gazebo_world_model': gazebo_world_model_relative_path,
             'gazebo_robot_model_sdf': gazebo_robot_model_sdf_relative_path,
@@ -255,8 +206,7 @@ class BenchmarkRun(object):
             print_error(e)
 
     def execute_run(self):
-
-        print_info(self.gazebo_model_path_env_var)
+        self.log(event=f"run_start")
 
         supervisor_params = {
             'configuration': self.supervisor_configuration_path,
@@ -274,35 +224,22 @@ class BenchmarkRun(object):
         }
 
         navigation_params = {
-            'params_file': self.nav2_navigation_configuration_path,
-        }
-
-        local_planner_params = {
-            'params_file': self.local_planner_configuration_path
-        }
-
-        global_planner_params = {
-            'params_file': self.global_planner_configuration_path
+            'local_planner_params_file': self.local_planner_configuration_path,
+            'global_planner_params_file': self.global_planner_configuration_path,
+            'nav_params_file': self.nav2_navigation_configuration_path,
         }
 
         # declare components
         supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', supervisor_params)
-        environment = Component('launch', 'local_planning_performance_modelling', 'environment.launch.py', environment_params)
-        navigation = Component('launch', 'local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
-        local_planner = Component('launch', 'local_planning_performance_modelling', 'local_planner.launch.py', local_planner_params)
-        global_planner = Component('launch', 'local_planning_performance_modelling', 'global_planner.launch.py', global_planner_params)
+        environment = Component('environment', 'local_planning_performance_modelling', 'environment.launch.py', environment_params)
+        navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
 
         # add components to launcher
         components_launcher = ComponentsLauncher()
-        # if not self.headless:
-        #     components_launcher.add_component(rviz)
-        # components_launcher.add_component(rviz)
-        # recorder.launch()
+        # recorder.launch()  # TODO
         components_launcher.add_component(supervisor)
         components_launcher.add_component(environment)
         components_launcher.add_component(navigation)
-        components_launcher.add_component(local_planner)
-        components_launcher.add_component(global_planner)
 
         # launch components and wait for the supervisor to finish
         self.log(event="waiting_supervisor_finish")
@@ -312,15 +249,6 @@ class BenchmarkRun(object):
         # make sure remaining components have shutdown
         components_launcher.shutdown()
         print_info("execute_run: components shutdown completed")
-
-        # compute all relevant metrics and visualisations
-        # noinspection PyBroadException
-#        try:
-#            self.log(event="start_compute_metrics")
-#            compute_metrics(self.run_output_folder)
-#        except:
-#            print_error("failed metrics computation")
-#            print_error(traceback.format_exc())
 
         self.log(event="run_end")
         print_info(f"run {self.run_id} completed")

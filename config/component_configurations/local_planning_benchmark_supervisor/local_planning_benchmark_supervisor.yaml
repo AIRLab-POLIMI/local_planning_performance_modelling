@@ -15,6 +15,7 @@ local_planning_benchmark_supervisor:
     estimated_pose_correction_topic: /amcl_pose
     ground_truth_pose_topic: /ground_truth/base_footprint/odom
     goal_pose_topic: /goal_pose
+    navigation_transition_event_topic: /bt_navigator/transition_event
 
     # service names
     lifecycle_manager_service: /lifecycle_manager/manage_nodes

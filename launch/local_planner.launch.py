@@ -12,15 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from nav2_common.launch import RewrittenYaml
 
 
 def generate_launch_description():
@@ -29,8 +24,14 @@ def generate_launch_description():
     lifecycle_nodes = ['controller_server']
 
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
+
+        # Set env var to print messages to stdout immediately and with color
+        SetEnvironmentVariable(
+            name='RCUTILS_LOGGING_BUFFERED_STREAM',
+            value='1'),
+        SetEnvironmentVariable(
+            name='RCUTILS_COLORIZED_OUTPUT',
+            value='1'),
 
         DeclareLaunchArgument(
             'params_file',

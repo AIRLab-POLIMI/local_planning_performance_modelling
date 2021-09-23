@@ -6,12 +6,14 @@ import time
 import traceback
 
 import geometry_msgs
+import lifecycle_msgs
 import nav_msgs
 import networkx as nx
 import numpy as np
 import pandas as pd
 import pyquaternion
 import rclpy
+import yaml
 from action_msgs.msg import GoalStatus
 from gazebo_msgs.srv import SetEntityState
 from nav2_msgs.action import NavigateToPose
@@ -23,7 +25,8 @@ from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
-from rclpy.qos import qos_profile_sensor_data
+from lifecycle_msgs.msg import TransitionEvent
+from rclpy.qos import qos_profile_sensor_data, qos_profile_parameter_events
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
 
@@ -73,12 +76,11 @@ class LocalPlanningBenchmarkSupervisor(Node):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # topics, services, actions, entities and frames names
-        #cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
-        
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
         goal_pose_topic = self.get_parameter('goal_pose_topic').value
+        navigation_transition_event_topic = self.get_parameter('navigation_transition_event_topic').value
         lifecycle_manager_service = self.get_parameter('lifecycle_manager_service').value
         global_costmap_get_parameters_service = self.get_parameter('global_costmap_get_parameters_service').value
         pause_physics_service = self.get_parameter('pause_physics_service').value
@@ -115,8 +117,9 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ps_snapshot_count = 0
         self.received_first_scan = False
         self.latest_ground_truth_pose_msg = None
-        self.local_planning_node_activated = False
+        self.navigation_node_activated = False
         self.robot_radius = None
+        self.pseudo_random_voronoi_index = None
         self.goal_pose = None
 
         # prepare folder structure
@@ -132,12 +135,14 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
         self.run_events_file_path = path.join(self.benchmark_data_folder, "run_events.csv")
+        self.run_data_file_path = path.join(self.benchmark_data_folder, "run_data.yaml")
         self.init_run_events_file()
 
         # pandas dataframes for benchmark data
         self.estimated_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta'])
         self.estimated_correction_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'cov_x_x', 'cov_x_y', 'cov_y_y', 'cov_theta_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
+        self.run_data = dict()
 
         # setup timers
         self.create_timer(run_timeout, self.run_timeout_callback)
@@ -162,6 +167,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
+        self.create_subscription(TransitionEvent, navigation_transition_event_topic, self.lifecycle_transition_event_callback, qos_profile_parameter_events)
 
         # setup action clients
         self.navigate_to_pose_action_client = ActionClient(self, NavigateToPose, navigate_to_pose_action)
@@ -169,24 +175,23 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
-        print_info("preparing to start run")
+        print_info("waiting simulator and navigation stack")
 
-        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup)
+        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup) and for the navigation stack to activate
         waiting_time = 0.0
         waiting_period = 0.5
-        while not self.received_first_scan and rclpy.ok():
+        while not self.received_first_scan and not self.navigation_node_activated and rclpy.ok():
             time.sleep(waiting_period)
             rclpy.spin_once(self)
             waiting_time += waiting_period
             if waiting_time > 5.0:
-                self.get_logger().warning('still waiting to receive first sensor message from environment')
+                self.get_logger().warning('still waiting to receive first sensor message from environment and navigation to be activated')
                 waiting_time = 0.0
 
         # get the parameter robot_radius from the global costmap
         parameters_request = GetParameters.Request(names=['robot_radius'])
         parameters_response = self.call_service(self.global_costmap_get_parameters_service_client, parameters_request)
         self.robot_radius = parameters_response.values[0].double_value
-        print_info("got robot radius")
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
@@ -198,40 +203,34 @@ class LocalPlanningBenchmarkSupervisor(Node):
             voronoi_graph.remove_nodes_from(graph_component)
 
         if len(voronoi_graph.nodes) < 2:
-            self.write_event(self.get_clock().now(), 'insufficient_number_of_nodes_in_deleaved_reduced_voronoi_graph')
+            self.write_event('insufficient_number_of_nodes_in_deleaved_reduced_voronoi_graph')
             raise RunFailException("insufficient number of nodes in deleaved_reduced_voronoi_graph, can not generate traversal path")
 
-        # select the node from the run number
+        # select the node pseudo-randomly using the run number
+        # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
+        #
         nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
-        print("voronoi_graph.nodes\n", voronoi_graph.nodes)
-        print("nil", nil)
-
         random.Random(0).shuffle(nil)
-        print("voronoi_graph.nodes\n", voronoi_graph.nodes)
-        print("nil\n", nil)
+        self.pseudo_random_voronoi_index = nil[self.run_index % len(nil)]
 
         # convert Voronoi node to pose
         self.goal_pose = PoseStamped()
         self.goal_pose.header.stamp = self.get_clock().now().to_msg()
         self.goal_pose.header.frame_id = self.fixed_frame
         self.goal_pose.pose = Pose()
-        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[nil[self.run_index % len(nil)]]['vertex']
+        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
         self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
         self.goal_pose_publisher.publish(self.goal_pose)
 
-        self.write_event(self.get_clock().now(), 'run_start')
+        self.write_event('run_start')
         self.run_started = True
-
         self.send_goal()
 
     def send_goal(self):
-        print_info("waiting")
-        time.sleep(5.0)
-        print_info("finished waiting")
 
         if not self.navigate_to_pose_action_client.wait_for_server(timeout_sec=5.0):
-            self.write_event(self.get_clock().now(), 'failed_to_communicate_with_navigation_node')
+            self.write_event('failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
 
         goal_msg = NavigateToPose.Goal()
@@ -240,16 +239,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
         self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
-        self.write_event(self.get_clock().now(), 'target_pose_set')
-        print_info("goal_msg", goal_msg)
+        self.write_event('navigation_goal_sent')
+        self.run_data["goal_pose"] = self.goal_pose.pose
+        self.run_data["voronoi_node_index"] = self.pseudo_random_voronoi_index
 
     def ros_shutdown_callback(self):
         """
         This function is called when the node receives an interrupt signal (KeyboardInterrupt).
         """
         print_info("asked to shutdown, terminating run")
-        self.write_event(self.get_clock().now(), 'ros_shutdown')
-        self.write_event(self.get_clock().now(), 'supervisor_finished')
+        self.write_event('ros_shutdown')
+        self.write_event('supervisor_finished')
 
     def end_run(self):
         """
@@ -260,58 +260,55 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
 
+        with open(self.run_data_file_path, 'w') as run_data_file:
+            yaml.dump(self.run_data, run_data_file)
+
     def goal_response_callback(self, future):
         goal_handle = future.result()
-        print_info("goal_handle", goal_handle)
 
         # if the goal is rejected try with the next goal
         if not goal_handle.accepted:
             print_error('navigation action goal rejected')
-            self.write_event(self.get_clock().now(), 'target_pose_rejected')
+            self.write_event('navigation_goal_rejected')
             rclpy.shutdown()
             return
 
-        self.write_event(self.get_clock().now(), 'target_pose_accepted')
+        self.write_event('navigation_goal_accepted')
 
         self.navigate_to_pose_action_result_future = goal_handle.get_result_async()
         self.navigate_to_pose_action_result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         status = future.result().status
-        print_info("status", status)
+        self.run_data["navigation_final_status"] = status
 
         if status == GoalStatus.STATUS_SUCCEEDED:
+            self.write_event('navigation_succeeded')
             goal_position = self.goal_pose.pose.position
             current_position = self.latest_ground_truth_pose_msg.pose.pose.position
             distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
             if distance_from_goal < self.goal_tolerance:
-                self.write_event(self.get_clock().now(), 'target_pose_reached')
+                self.write_event('navigation_goal_reached')
             else:
                 print_error("goal status succeeded but current position farther from goal position than tolerance")
-                self.write_event(self.get_clock().now(), 'target_pose_not_reached')
+                self.write_event('navigation_goal_not_reached')
 
         else:
             print_info('navigation action failed with status {}'.format(status))
-            self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-            
-        self.write_event(self.get_clock().now(), 'run_completed')
+            self.write_event('navigation_failed')
+
+        self.write_event('run_completed')
         rclpy.shutdown()
 
-    def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
+    def lifecycle_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time
-        if transition_event_msg.goal_state.label == 'active' and not self.local_planning_node_activated:
-            if self.initial_pose is None:
-                print_error("initial_pose is still None")
-                return
-
-            self.local_planning_node_activated = True
-            self.initial_pose_publisher.publish(self.initial_pose)
-            self.write_event(self.get_clock().now(), "initial_pose_set")
+        if transition_event_msg.goal_state.label == 'active' and not self.navigation_node_activated:
+            self.navigation_node_activated = True
+            self.write_event("navigation_node_activated")
 
     def run_timeout_callback(self):
         print_error("terminating supervisor due to timeout, terminating run")
-        self.write_event(self.get_clock().now(), 'run_timeout')
-        self.write_event(self.get_clock().now(), 'supervisor_finished')
+        self.write_event('run_timeout')
         rclpy.shutdown()
 
     def scan_callback(self, laser_scan_msg):
@@ -418,13 +415,16 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.get_logger().error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
             self.get_logger().error(e)
 
-    def write_event(self, stamp, event):
-        print_info("t: {t}, event: {event}".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+    def write_event(self, event):
+        ros_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
+        real_time = time.time()
+        event_string = f"t: {ros_time}, real_time: {real_time}, event: {str(event)}"
+        print_info(event_string)
         try:
             with open(self.run_events_file_path, 'a') as run_events_file:
-                run_events_file.write("{t}, {event}\n".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+                run_events_file.write(event_string+'\n')
         except IOError as e:
-            self.get_logger().error("slam_benchmark_supervisor.write_event: could not write event to run_events_file: {t} {event}".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+            self.get_logger().error(f"write_event: could not write event to run_events_file: {event_string}")
             self.get_logger().error(e)
 
     def call_service(self, service_client, request, fail_timeout=30.0, warning_timeout=5.0):

@@ -24,8 +24,14 @@ def generate_launch_description():
     lifecycle_nodes = ['planner_server']
 
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
-        SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
+
+        # Set env var to print messages to stdout immediately and with color
+        SetEnvironmentVariable(
+            name='RCUTILS_LOGGING_BUFFERED_STREAM',
+            value='1'),
+        SetEnvironmentVariable(
+            name='RCUTILS_COLORIZED_OUTPUT',
+            value='1'),
 
         DeclareLaunchArgument(
             'params_file',
