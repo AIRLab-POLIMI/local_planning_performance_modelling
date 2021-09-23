@@ -129,6 +129,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.goal_succeeded_count = 0
         self.goal_failed_count = 0
         self.goal_rejected_count = 0
+        self.goal_pose = None
 
         # prepare folder structure
         if not path.exists(self.benchmark_data_folder):
@@ -265,11 +266,12 @@ class LocalPlanningBenchmarkSupervisor(Node):
         goal_pose.header.frame_id = "map"
         goal_pose.header.stamp =  self.get_clock().now().to_msg()
         goal_pose.pose = pose
+        self.goal_pose = goal_pose
         #self.initial_pose_publisher.publish(goal_pose)
 
 
-        print(pose)
-        print(goal_pose)
+        #print(pose)
+        #print(goal_pose)
 
         #MARIA: COMMENTED FROM HERE TO LINE 279
         # pose_stamped = PoseStamped()
@@ -338,6 +340,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         #MARIA
         goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = self.goal_pose
         goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
         goal_msg.pose.header.frame_id = self.fixed_frame
         self.current_goal = goal_msg
@@ -412,7 +415,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         #the goal has been sent and the navigation stack reached the goal, end the run
         self.write_event(self.get_clock().now(), 'run_completed')
 
-        return
+        #return
 
         rclpy.shutdown()
       
