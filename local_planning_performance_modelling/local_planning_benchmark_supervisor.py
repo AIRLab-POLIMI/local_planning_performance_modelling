@@ -110,6 +110,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.initial_pose_covariance_matrix[1, 1] = self.get_parameter('initial_pose_std_xy').value**2
         self.initial_pose_covariance_matrix[5, 5] = self.get_parameter('initial_pose_std_theta').value**2
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
+        self.goal_obstacle_min_distance = self.get_parameter('goal_obstacle_min_distance').value
 
         # run variables
         self.run_started = False
@@ -118,7 +119,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.received_first_scan = False
         self.latest_ground_truth_pose_msg = None
         self.navigation_node_activated = False
-        self.robot_radius = None
+        # self.robot_radius = None
         self.pseudo_random_voronoi_index = None
         self.goal_pose = None
 
@@ -188,13 +189,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 self.get_logger().warning('still waiting to receive first sensor message from environment and navigation to be activated')
                 waiting_time = 0.0
 
-        # get the parameter robot_radius from the global costmap
-        parameters_request = GetParameters.Request(names=['robot_radius'])
-        parameters_response = self.call_service(self.global_costmap_get_parameters_service_client, parameters_request)
-        self.robot_radius = parameters_response.values[0].double_value
-
         # get deleaved reduced Voronoi graph from ground truth map
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
@@ -253,7 +249,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
     def end_run(self):
         """
         This function is called after the run has completed, whether the run finished correctly, or there was an exception.
-        The only case in which this function is not called is if an exception was raised from LocalPlanningBenchmarkSupervisor.__init__
+        The only case in which this function is not called is if an exception was raised from self.__init__
         """
         self.estimated_poses_df.to_csv(self.estimated_poses_file_path, index=False)
         self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
@@ -341,25 +337,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             pass
-
-    def estimated_pose_correction_callback(self, pose_with_covariance_msg: geometry_msgs.msg.PoseWithCovarianceStamped):
-        if not self.run_started:
-            return
-
-        orientation = pose_with_covariance_msg.pose.pose.orientation
-        theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
-        covariance_mat = np.array(pose_with_covariance_msg.pose.covariance).reshape(6, 6)
-
-        self.estimated_correction_poses_df = self.estimated_correction_poses_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(pose_with_covariance_msg.header.stamp).nanoseconds),
-            'x': pose_with_covariance_msg.pose.pose.position.x,
-            'y': pose_with_covariance_msg.pose.pose.position.y,
-            'theta': theta,
-            'cov_x_x': covariance_mat[0, 0],
-            'cov_x_y': covariance_mat[0, 1],
-            'cov_y_y': covariance_mat[1, 1],
-            'cov_theta_theta': covariance_mat[5, 5]
-        }, ignore_index=True)
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         self.latest_ground_truth_pose_msg = odometry_msg

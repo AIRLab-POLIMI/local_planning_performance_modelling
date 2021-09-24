@@ -82,8 +82,8 @@ local_costmap:
       plugin_names: ["obstacle_layer", "inflation_layer"]
       plugin_types: ["nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
       rolling_window: true
-      width: 3
-      height: 3
+      width: 6
+      height: 6
       origin_x: -1.5
       origin_y: -1.5
       resolution: 0.05

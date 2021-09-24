@@ -36,7 +36,7 @@ controller_server:
       teb_autoresize: True
       min_samples: 3
       max_samples: 20
-      max_global_plan_lookahead_dist: 3.0  # TODO changed from default (1.0), better to revert
+      max_global_plan_lookahead_dist: 1.0  # TODO changed from default (1.0), better to revert
       visualize_hc_graph: True
       max_vel_x: 0.26
       max_vel_theta: 1.0

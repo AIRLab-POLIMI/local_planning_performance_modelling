@@ -7,7 +7,7 @@ gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
 supervisor_component: local_planning_benchmark_supervisor
 
 hunter2_wheelbase: 0.65
-hunter2_footprint: "[[0.6775, 0.3725], [0.6775, -0.3725], [-0.275, -0.3725], [-0.275, 0.3725]]"
+hunter2_footprint: [[0.87, 0.47], [0.87, -0.47], [-0.20, -0.47], [-0.20, 0.47]]
 turtlebot_radius: 0.22
 
 components_configuration:
