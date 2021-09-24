@@ -77,6 +77,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # topics, services, actions, entities and frames names
         scan_topic = self.get_parameter('scan_topic').value
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
         goal_pose_topic = self.get_parameter('goal_pose_topic').value
@@ -134,6 +135,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.estimated_poses_file_path = path.join(self.benchmark_data_folder, "estimated_poses.csv")
         self.estimated_correction_poses_file_path = path.join(self.benchmark_data_folder, "estimated_correction_poses.csv")
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
+        self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
         self.run_events_file_path = path.join(self.benchmark_data_folder, "run_events.csv")
         self.run_data_file_path = path.join(self.benchmark_data_folder, "run_data.yaml")
@@ -141,8 +143,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # pandas dataframes for benchmark data
         self.estimated_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta'])
-        self.estimated_correction_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'cov_x_x', 'cov_x_y', 'cov_y_y', 'cov_theta_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
+        self.cmd_vel_df = pd.DataFrame(columns=['t', 'linear_x', 'linear_y', 'linear_z', 'angular_x', 'angular_y', 'angular_z'])
         self.run_data = dict()
 
         # setup timers
@@ -166,7 +168,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # setup subscribers
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
-        self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
+        self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
         self.create_subscription(TransitionEvent, navigation_transition_event_topic, self.lifecycle_transition_event_callback, qos_profile_parameter_events)
 
@@ -252,8 +254,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
         The only case in which this function is not called is if an exception was raised from self.__init__
         """
         self.estimated_poses_df.to_csv(self.estimated_poses_file_path, index=False)
-        self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
+        self.cmd_vel_df.to_csv(self.cmd_vel_file_path, index=False)
 
         with open(self.run_data_file_path, 'w') as run_data_file:
             yaml.dump(self.run_data, run_data_file)
@@ -321,6 +323,20 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 range_min=laser_scan_msg.range_min,
                 range_max=laser_scan_msg.range_max,
                 ranges=', '.join(map(str, laser_scan_msg.ranges))))
+
+    def cmd_vel_callback(self, twist_msg: Twist):
+        if not self.run_started:
+            return
+
+        self.cmd_vel_df = self.cmd_vel_df.append({
+            't': nanoseconds_to_seconds(self.get_clock().now().nanoseconds),
+            'linear_x': twist_msg.linear.x,
+            'linear_y': twist_msg.linear.y,
+            'linear_z': twist_msg.linear.z,
+            'angular_x': twist_msg.angular.x,
+            'angular_y': twist_msg.angular.y,
+            'angular_z': twist_msg.angular.z,
+        }, ignore_index=True)
 
     def write_estimated_pose_timer_callback(self):
         try:
