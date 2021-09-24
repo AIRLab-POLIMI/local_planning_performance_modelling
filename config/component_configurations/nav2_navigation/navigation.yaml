@@ -8,7 +8,7 @@ bt_navigator:
     enable_groot_monitoring: True
     groot_zmq_publisher_port: 1666
     groot_zmq_server_port: 1667
-    default_bt_xml_filename: "/opt/ros/foxy/share/nav2_bt_navigator/behavior_trees/navigate_w_replanning_and_recovery.xml"
+    default_bt_xml_filename: ""
     plugin_lib_names:
     - nav2_compute_path_to_pose_action_bt_node
     - nav2_follow_path_action_bt_node
@@ -87,7 +87,7 @@ local_costmap:
       origin_x: -1.5
       origin_y: -1.5
       resolution: 0.05
-      robot_radius: 0.22
+#      robot_radius: 0.22
       inflation_layer:
         cost_scaling_factor: 3.0
       obstacle_layer:
@@ -119,7 +119,7 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: True
-      robot_radius: 0.22
+#      robot_radius: 0.22
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]

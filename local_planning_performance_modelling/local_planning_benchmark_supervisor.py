@@ -208,7 +208,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # select the node pseudo-randomly using the run number
         # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
-        #
         nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
         random.Random(0).shuffle(nil)
         self.pseudo_random_voronoi_index = nil[self.run_index % len(nil)]

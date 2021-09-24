@@ -25,8 +25,6 @@ controller_server:
     # TEB controller parameters
     FollowPath:
       plugin: "teb_local_planner::TebLocalPlannerROS"
-      #footprint_model.type: circular
-      #footprint_model.radius: 0.17
       min_obstacle_dist: 0.1
       inflation_dist: 0.1
       costmap_converter_plugin: "costmap_converter::CostmapToPolygonsDBSMCCH"
@@ -38,7 +36,7 @@ controller_server:
       teb_autoresize: True
       min_samples: 3
       max_samples: 20
-      max_global_plan_lookahead_dist: 1.0
+      max_global_plan_lookahead_dist: 3.0  # TODO changed from default (1.0), better to revert
       visualize_hc_graph: True
       max_vel_x: 0.26
       max_vel_theta: 1.0
