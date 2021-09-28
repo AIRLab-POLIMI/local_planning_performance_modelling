@@ -166,6 +166,7 @@ class BenchmarkRun(object):
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.radius'] = turtlebot_radius
             elif robot_model == 'hunter2':
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = wheelbase
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.vertices'] = hunter2_footprint_string
             else:
                 raise ValueError()
@@ -189,7 +190,7 @@ class BenchmarkRun(object):
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frame_name")[0].text = "base_scan"
         gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "1"
         if robot_model == 'hunter2':
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/max_steer")[0].text = str(max_steering_rad)
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/max_steer")[0].text = str(max_steering_rad*1.1)
         if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
             os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
         gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
