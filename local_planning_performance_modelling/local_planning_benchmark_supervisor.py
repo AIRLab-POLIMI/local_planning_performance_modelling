@@ -1,11 +1,9 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import random
 import time
 import traceback
 
-import geometry_msgs
 import lifecycle_msgs
 import nav_msgs
 import networkx as nx
@@ -21,10 +19,9 @@ from nav2_msgs.srv import ManageLifecycleNodes
 from nav_msgs.msg import Odometry
 from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
-from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
+from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped
 from lifecycle_msgs.msg import TransitionEvent
 from rclpy.qos import qos_profile_sensor_data, qos_profile_parameter_events
 from rclpy.time import Time
@@ -41,7 +38,6 @@ from os import path
 
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, nanoseconds_to_seconds
 from std_srvs.srv import Empty
-from tf2_ros.buffer_interface import Stamped
 
 
 class RunFailException(Exception):
