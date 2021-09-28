@@ -14,17 +14,18 @@ controller_server:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
       movement_time_allowance: 10.0
-      
+
     # Goal checker parameters
     goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
       stateful: True
-      
+
     # TEB controller parameters
     FollowPath:
       plugin: "teb_local_planner::TebLocalPlannerROS"
+      cmd_angle_instead_rotvel: True
       min_obstacle_dist: 0.1
       inflation_dist: 0.1
       costmap_converter_plugin: "costmap_converter::CostmapToPolygonsDBSMCCH"
@@ -36,7 +37,7 @@ controller_server:
       teb_autoresize: True
       min_samples: 3
       max_samples: 20
-      max_global_plan_lookahead_dist: 1.0  # TODO changed from default (1.0), better to revert
+      max_global_plan_lookahead_dist: 1.0
       visualize_hc_graph: True
       max_vel_x: 0.26
       max_vel_theta: 1.0
@@ -47,4 +48,3 @@ controller_server:
 controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: True
-
