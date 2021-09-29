@@ -17,6 +17,7 @@ from xml.etree.ElementTree import tostring
 import time
 from os import path
 import numpy as np
+import math
 
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error
 from performance_modelling_py.component_proxies.ros2_component import Component, ComponentsLauncher
@@ -156,6 +157,7 @@ class BenchmarkRun(object):
             global_planner_configuration = yaml.safe_load(global_planner_configuration_file)
         if local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '50':
             global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 0.55
+            #global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 0.65/(math.tan(50))
         elif local_planner_node == 'teb' and robot_model == 'hunter2' and max_steering_angle_deg == '22':
             global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = 1.61
         else:

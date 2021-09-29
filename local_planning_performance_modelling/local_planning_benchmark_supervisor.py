@@ -78,7 +78,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # topics, services, actions, entities and frames names
-        #cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
         
         scan_topic = self.get_parameter('scan_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
@@ -144,12 +144,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
         self.run_events_file_path = path.join(self.benchmark_data_folder, "run_events.csv")
+
+        self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
+
         self.init_run_events_file()
 
         # pandas dataframes for benchmark data
         self.estimated_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta'])
         self.estimated_correction_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'cov_x_x', 'cov_x_y', 'cov_y_y', 'cov_theta_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
+
+        self.cmd_vel_df = pd.DataFrame(columns=['x', 'y', 'z', 'a_x', 'a_y', 'a_z'])
 
         # setup timers
         self.create_timer(run_timeout, self.run_timeout_callback)
@@ -175,7 +180,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.traversal_path_publisher = self.create_publisher(Path, "~/traversal_path", traversal_path_publisher_qos_profile)
 
         # setup subscribers
-        #self.create_subscription(Twist, cmd_vel_topic, self.scan_callback, qos_profile_sensor_data)
+        self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
         
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
@@ -370,6 +375,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
 
+        self.cmd_vel_df.to_csv(self.cmd_vel_file_path, index=False)
+
     def goal_response_callback(self, future):
         goal_handle = future.result()
         print_info("goal_handle", goal_handle)
@@ -490,6 +497,23 @@ class LocalPlanningBenchmarkSupervisor(Node):
             'cov_y_y': covariance_mat[1, 1],
             'cov_theta_theta': covariance_mat[5, 5]
         }, ignore_index=True)
+
+
+
+    def cmd_vel_callback(self, twist_msg: geometry_msgs.msg.Twist):
+        if not self.run_started:
+            return
+        
+        self.cmd_vel_df = self.cmd_vel_df.append({
+            'x': twist_msg.linear.x,
+            'y': twist_msg.linear.y,
+            'z': twist_msg.linear.x,
+            'a_x': twist_msg.angular.x,
+            'a_y': twist_msg.angular.y,
+            'a_z': twist_msg.angular.z,
+        }, ignore_index=True)
+
+
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         self.latest_ground_truth_pose_msg = odometry_msg
