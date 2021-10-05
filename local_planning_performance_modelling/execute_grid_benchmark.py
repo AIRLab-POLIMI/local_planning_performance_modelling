@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import glob
 import argparse
+import os
 from os import path
 
 from local_planning_performance_modelling.local_planning_benchmark_run import BenchmarkRun
@@ -22,8 +23,10 @@ def main():
                         required=False)
 
     default_grid_benchmark_configuration = "grid_benchmark_all.yaml"
+    benchmark_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
     parser.add_argument('-c', dest='grid_benchmark_configuration',
-                        help=f'Yaml file with the configuration of the benchmark relative to the benchmark_configurations folder in this package. Defaults to {default_grid_benchmark_configuration}',
+                        help=f'Yaml file with the configuration of the benchmark relative to the benchmark_configurations folder in this package. Defaults to {default_grid_benchmark_configuration}. Available configuration files:\n' +
+                             '\n'.join(os.listdir(benchmark_configurations_dir_path)),
                         type=str,
                         default=default_grid_benchmark_configuration,
                         required=False)
@@ -65,7 +68,7 @@ def main():
     args = parser.parse_args()
     base_run_folder = path.expanduser(args.base_run_folder)
     environment_folders = sorted(filter(path.isdir, glob.glob(path.expanduser(args.environment_dataset_folders))))
-    grid_benchmark_configuration = path.join(path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/"), args.grid_benchmark_configuration)
+    grid_benchmark_configuration = path.join(benchmark_configurations_dir_path, args.grid_benchmark_configuration)
 
     execute_grid_benchmark(benchmark_run_object=BenchmarkRun,
                            grid_benchmark_configuration=grid_benchmark_configuration,
