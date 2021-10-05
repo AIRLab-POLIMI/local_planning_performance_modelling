@@ -15,6 +15,7 @@ components_configuration:
   nav2_amcl: nav2_amcl/nav2_amcl_1.yaml
   nav2_navigation: nav2_navigation/navigation.yaml
   behaviour_tree: nav2_navigation/navigate_w_replanning.xml
+  rpp: nav2_navigation/rpp.yaml
   teb: nav2_navigation/teb.yaml
   dwb: nav2_navigation/dwb.yaml
   navfn: nav2_navigation/navfn.yaml
