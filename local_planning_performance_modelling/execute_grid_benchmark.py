@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import glob
 import argparse
+import os
 from os import path
 
 from local_planning_performance_modelling.local_planning_benchmark_run import BenchmarkRun
@@ -14,30 +15,34 @@ from performance_modelling_py.benchmark_execution.grid_benchmarking import execu
 def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description='Execute the benchmark')
-
+    default_environment_dataset_folders = "~/ds/performance_modelling/test_datasets/dataset/*"
     parser.add_argument('-e', dest='environment_dataset_folders',
-                        help='Dataset folders containg the environment data. Use wildcards to select multiple folders. Only folders are selected, files are ignored.',
+                        help=f'Dataset folders containing the environment data. Use wildcards to select multiple folders. Only folders are selected, files are ignored. Defaults to {default_environment_dataset_folders}',
                         type=str,
-                        default="~/ds/performance_modelling/test_datasets/dataset/*",
+                        default=default_environment_dataset_folders,
                         required=False)
 
+    default_grid_benchmark_configuration = "grid_benchmark_all.yaml"
+    benchmark_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
     parser.add_argument('-c', dest='grid_benchmark_configuration',
-                        help='Yaml file with the configuration of the benchmark.',
+                        help=f'Yaml file with the configuration of the benchmark relative to the benchmark_configurations folder in this package. Defaults to {default_grid_benchmark_configuration}. Available configuration files:\n' +
+                             '\n'.join(os.listdir(benchmark_configurations_dir_path)),
                         type=str,
-                        default="~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/grid_benchmark_1.yaml",
+                        default=default_grid_benchmark_configuration,
                         required=False)
 
+    default_base_run_folder = "~/ds/performance_modelling/output/test_local_planning/"
     parser.add_argument('-r', dest='base_run_folder',
-                        help='Folder in which the result of each run will be placed.',
+                        help=f'Folder in which the result of each run will be placed. Defaults to {default_base_run_folder}',
                         type=str,
-                        default="~/ds/performance_modelling/output/test_local_planning/",
+                        default=default_base_run_folder,
                         required=False)
 
+    default_num_runs = 1
     parser.add_argument('-n', '--num-runs', dest='num_runs',
-                        help='Number of runs to be executed for each combination of configurations.',
+                        help=f'Number of runs to be executed for each combination of configurations. Defaults to {default_num_runs}',
                         type=int,
-                        default=1,
-                        #default=10
+                        default=default_num_runs,
                         required=False)
 
     parser.add_argument('--ignore-previous-runs', dest='ignore_previous_runs',
@@ -63,7 +68,7 @@ def main():
     args = parser.parse_args()
     base_run_folder = path.expanduser(args.base_run_folder)
     environment_folders = sorted(filter(path.isdir, glob.glob(path.expanduser(args.environment_dataset_folders))))
-    grid_benchmark_configuration = path.expanduser(args.grid_benchmark_configuration)
+    grid_benchmark_configuration = path.join(benchmark_configurations_dir_path, args.grid_benchmark_configuration)
 
     execute_grid_benchmark(benchmark_run_object=BenchmarkRun,
                            grid_benchmark_configuration=grid_benchmark_configuration,

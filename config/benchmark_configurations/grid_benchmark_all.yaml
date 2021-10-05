@@ -6,15 +6,23 @@ gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
 
 supervisor_component: local_planning_benchmark_supervisor
 
+hunter2_wheelbase: 0.65
+hunter2_footprint: [[0.87, 0.47], [0.87, -0.47], [-0.20, -0.47], [-0.20, 0.47]]
+turtlebot_radius: 0.22
+
 components_configuration:
   supervisor: local_planning_benchmark_supervisor/local_planning_benchmark_supervisor.yaml
   nav2_amcl: nav2_amcl/nav2_amcl_1.yaml
   nav2_navigation: nav2_navigation/navigation.yaml
+  behaviour_tree: nav2_navigation/navigate_w_replanning.xml
+  rpp: nav2_navigation/rpp.yaml
   teb: nav2_navigation/teb.yaml
   dwb: nav2_navigation/dwb.yaml
   navfn: nav2_navigation/navfn.yaml
   smac: nav2_navigation/smac.yaml
   rviz: rviz/nav2_default_view.rviz
+
+run_index: &id001 [1]
 
 combinatorial_parameters: [
   {
@@ -22,10 +30,19 @@ combinatorial_parameters: [
     local_planner_node: [teb],
     global_planner_node: [smac],
     max_steering_angle_deg: [15,22,50],
+    run_index: *id001,
   },
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
-    local_planner_node: [dwb, teb],
+    local_planner_node: [teb],
+    global_planner_node: [smac],
+    max_steering_angle_deg: [40],
+    run_index: *id001,
+  },
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [dwb],
     global_planner_node: [navfn],
+    run_index: *id001,
   },
 ]
