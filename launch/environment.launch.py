@@ -127,7 +127,8 @@ def generate_launch_description():
 
     rviz_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
-        condition=IfCondition(use_rviz),
+        #condition=IfCondition(use_rviz),
+        condition=IfCondition(PythonExpression([use_rviz, ' and not ', headless])),
         launch_arguments={'rviz_config_file': rviz_config_file}.items())
 
     # Create the launch description and populate
