@@ -6,10 +6,12 @@ from __future__ import print_function
 import glob
 import argparse
 import os
+import sys
 from os import path
 
 from local_planning_performance_modelling.local_planning_benchmark_run import BenchmarkRun
 from performance_modelling_py.benchmark_execution.grid_benchmarking import execute_grid_benchmark
+from performance_modelling_py.utils import print_error
 
 
 def main():
@@ -22,13 +24,21 @@ def main():
                         default=default_environment_dataset_folders,
                         required=False)
 
-    default_grid_benchmark_configuration = "grid_benchmark_all.yaml"
     benchmark_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
-    parser.add_argument('-c', dest='grid_benchmark_configuration',
-                        help=f'Yaml file with the configuration of the benchmark relative to the benchmark_configurations folder in this package. Defaults to {default_grid_benchmark_configuration}. Available configuration files:\n' +
+    default_benchmark_configuration_from_package = "grid_benchmark_all.yaml"
+    parser.add_argument('-p', dest='benchmark_configuration_from_package',
+                        help=f'Yaml file with the configuration of the benchmark relative to the config/benchmark_configurations folder in this package. If set, the option "benchmark_configuration" will be ignored.'
+                             f' Defaults to {default_benchmark_configuration_from_package}. Available configuration files:\n' +
                              '\n'.join(os.listdir(benchmark_configurations_dir_path)),
                         type=str,
-                        default=default_grid_benchmark_configuration,
+                        default=None,
+                        required=False)
+
+    default_benchmark_configuration = path.join(benchmark_configurations_dir_path, default_benchmark_configuration_from_package)
+    parser.add_argument('-c', dest='benchmark_configuration',
+                        help=f'Yaml file with the configuration of the benchmark. This option is ignored if the option benchmark_configuration_from_package is set. Defaults to {default_benchmark_configuration}.',
+                        type=str,
+                        default=default_benchmark_configuration,
                         required=False)
 
     default_base_run_folder = "~/ds/performance_modelling/output/test_local_planning/"
@@ -68,7 +78,13 @@ def main():
     args = parser.parse_args()
     base_run_folder = path.expanduser(args.base_run_folder)
     environment_folders = sorted(filter(path.isdir, glob.glob(path.expanduser(args.environment_dataset_folders))))
-    grid_benchmark_configuration = path.join(benchmark_configurations_dir_path, args.grid_benchmark_configuration)
+    if args.benchmark_configuration_from_package is not None:
+        grid_benchmark_configuration = path.join(benchmark_configurations_dir_path, args.benchmark_configuration_from_package)
+    else:
+        grid_benchmark_configuration = path.expanduser(args.benchmark_configuration)
+    if not path.exists(grid_benchmark_configuration):
+        print_error(f"benchmark configuration file [{path.abspath(grid_benchmark_configuration)}] does not exists")
+        sys.exit(-1)
 
     execute_grid_benchmark(benchmark_run_object=BenchmarkRun,
                            grid_benchmark_configuration=grid_benchmark_configuration,
