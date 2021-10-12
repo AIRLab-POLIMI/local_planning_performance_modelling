@@ -18,15 +18,10 @@ components_configuration:
   rviz: rviz/nav2_default_view.rviz
 
 combinatorial_parameters: [
-  {
-    robot_model: [hunter2],
-    local_planner_node: [teb],
-    global_planner_node: [smac],
-    max_steering_angle_deg: [15,22,50],
-  },
+
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
-    local_planner_node: [dwb, teb, pure_pursuit],
+    local_planner_node: [pure_pursuit],
     global_planner_node: [navfn],
   },
 ]

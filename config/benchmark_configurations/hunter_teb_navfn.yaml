@@ -12,7 +12,6 @@ components_configuration:
   nav2_navigation: nav2_navigation/navigation.yaml
   teb: nav2_navigation/teb.yaml
   dwb: nav2_navigation/dwb.yaml
-  pure_pursuit: nav2_navigation/pure_pursuit.yaml
   navfn: nav2_navigation/navfn.yaml
   smac: nav2_navigation/smac.yaml
   rviz: rviz/nav2_default_view.rviz
@@ -21,12 +20,7 @@ combinatorial_parameters: [
   {
     robot_model: [hunter2],
     local_planner_node: [teb],
-    global_planner_node: [smac],
-    max_steering_angle_deg: [15,22,50],
-  },
-  {
-    robot_model: [turtlebot3_waffle_performance_modelling],
-    local_planner_node: [dwb, teb, pure_pursuit],
     global_planner_node: [navfn],
+    max_steering_angle_deg: [50],
   },
 ]
