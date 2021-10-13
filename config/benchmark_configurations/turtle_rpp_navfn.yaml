@@ -1,5 +1,6 @@
 robots_dataset: ~/ds/performance_modelling/test_datasets/robots
 
+source_workspace_path: ~/w/ros2_ws/src/
 components_configurations_folder: ~/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations
 gazebo_model_path_env_var: [~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
 gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
@@ -11,15 +12,15 @@ hunter2_footprint: [[0.87, 0.47], [0.87, -0.47], [-0.20, -0.47], [-0.20, 0.47]]
 turtlebot_radius: 0.22
 
 components_configuration:
-  supervisor: local_planning_benchmark_supervisor/local_planning_benchmark_supervisor.yaml
-  nav2_amcl: nav2_amcl/nav2_amcl_1.yaml
-  nav2_navigation: nav2_navigation/navigation.yaml
-  behaviour_tree: nav2_navigation/navigate_w_replanning.xml
-  rpp: nav2_navigation/rpp.yaml
-  teb: nav2_navigation/teb.yaml
-  dwb: nav2_navigation/dwb.yaml
-  navfn: nav2_navigation/navfn.yaml
-  smac: nav2_navigation/smac.yaml
+  supervisor: supervisor/local_planning_benchmark_supervisor.yaml
+  amcl: localization/amcl.yaml
+  nav2_navigation: navigation_stack/navigation.yaml
+  behaviour_tree: navigation_stack/navigate_w_replanning.xml
+  rpp: navigation_stack/rpp.yaml
+  teb: navigation_stack/teb.yaml
+  dwb: navigation_stack/dwb.yaml
+  navfn: navigation_stack/navfn.yaml
+  smac: navigation_stack/smac.yaml
   rviz: rviz/nav2_default_view.rviz
 
 run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -27,6 +28,7 @@ run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 combinatorial_parameters: [
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
+    localization_node: [amcl],
     local_planner_node: [rpp],
     global_planner_node: [navfn],
     run_index: *id001,

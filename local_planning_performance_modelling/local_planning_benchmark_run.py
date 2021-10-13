@@ -12,6 +12,7 @@ import time
 from os import path
 import numpy as np
 
+from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error
 from performance_modelling_py.component_proxies.ros2_component import Component, ComponentsLauncher
 
@@ -45,6 +46,7 @@ class BenchmarkRun(object):
 
         self.run_index = self.run_parameters['run_index']
         robot_model = self.run_parameters['robot_model']
+        localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
@@ -77,6 +79,7 @@ class BenchmarkRun(object):
         # components original configuration paths
         components_configurations_folder = path.expanduser(self.benchmark_configuration['components_configurations_folder'])
         original_supervisor_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['supervisor'])
+        original_localization_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][localization_node])
         original_nav2_navigation_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['nav2_navigation'])
         original_behaviour_tree_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['behaviour_tree'])
         self.original_rviz_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['rviz'])
@@ -89,6 +92,7 @@ class BenchmarkRun(object):
 
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
+        localization_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][localization_node])
         nav2_navigation_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['nav2_navigation'])
         behaviour_tree_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['behaviour_tree'])
         local_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][local_planner_node])
@@ -100,6 +104,7 @@ class BenchmarkRun(object):
 
         # components configuration paths in run folder
         self.supervisor_configuration_path = path.join(self.run_output_folder, supervisor_configuration_relative_path)
+        self.localization_configuration_path = path.join(self.run_output_folder, localization_configuration_relative_path)
         self.nav2_navigation_configuration_path = path.join(self.run_output_folder, nav2_navigation_configuration_relative_path)
         behaviour_tree_configuration_path = path.join(self.run_output_folder, behaviour_tree_configuration_relative_path)
         self.local_planner_configuration_path = path.join(self.run_output_folder, local_planner_configuration_relative_path)
@@ -122,6 +127,17 @@ class BenchmarkRun(object):
             os.makedirs(path.dirname(self.supervisor_configuration_path))
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
+
+        # copy the configuration of the localization to the run folder and update its parameters
+        with open(original_localization_configuration_path) as localization_configuration_file:
+            localization_configuration = yaml.safe_load(localization_configuration_file)
+        if localization_node == 'amcl':
+            pass
+            # localization_configuration['amcl']['ros__parameters']['TODO'] = "TODO"
+        if not path.exists(path.dirname(self.localization_configuration_path)):
+            os.makedirs(path.dirname(self.localization_configuration_path))
+        with open(self.localization_configuration_path, 'w') as localization_configuration_file:
+            yaml.dump(localization_configuration, localization_configuration_file, default_flow_style=False)
 
         # copy the configuration of the nav2_navigation to the run folder and update its parameters
         with open(original_nav2_navigation_configuration_path) as nav2_navigation_configuration_file:
@@ -160,11 +176,14 @@ class BenchmarkRun(object):
         with open(original_local_planner_configuration_path) as local_planner_configuration_file:
             local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
         if local_planner_node == 'teb':
-            local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = min_turning_radius
+            if min_turning_radius is not None:
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = min_turning_radius
             if robot_model == 'turtlebot3_waffle_performance_modelling':
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = False
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "circular"
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.radius'] = turtlebot_radius
             elif robot_model == 'hunter2':
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = wheelbase
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.vertices'] = hunter2_footprint_string
@@ -214,8 +233,10 @@ class BenchmarkRun(object):
         run_info_dict["run_parameters"] = self.run_parameters
         run_info_dict["local_components_configuration"] = {
             'supervisor': supervisor_configuration_relative_path,
-            # 'nav2_amcl': nav2_amcl_configuration_relative_path,
+            'localization': localization_configuration_relative_path,
             'nav2_navigation': nav2_navigation_configuration_relative_path,
+            'local_planner_configuration_relative_path': local_planner_configuration_relative_path,
+            'global_planner_configuration_relative_path': global_planner_configuration_relative_path,
             'behaviour_tree': behaviour_tree_configuration_relative_path,
             'gazebo_world_model': gazebo_world_model_relative_path,
             'gazebo_robot_model_sdf': gazebo_robot_model_sdf_relative_path,
@@ -225,6 +246,9 @@ class BenchmarkRun(object):
 
         with open(run_info_file_path, 'w') as run_info_file:
             yaml.dump(run_info_dict, run_info_file, default_flow_style=False)
+
+        # log packages and software versions and status
+        log_packages_and_repos(source_workspace_path=self.benchmark_configuration['source_workspace_path'], log_dir_path=path.join(self.run_output_folder, "software_versions_log"), use_rospack=False)
 
     def log(self, event):
 
@@ -260,6 +284,10 @@ class BenchmarkRun(object):
             'rviz_config_file': self.original_rviz_configuration_path
         }
 
+        localization_params = {
+            'localization_params_file': self.localization_configuration_path,
+        }
+
         navigation_params = {
             'local_planner_params_file': self.local_planner_configuration_path,
             'global_planner_params_file': self.global_planner_configuration_path,
@@ -269,6 +297,7 @@ class BenchmarkRun(object):
         # declare components
         supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', supervisor_params)
         environment = Component('environment', 'local_planning_performance_modelling', 'environment.launch.py', environment_params)
+        localization = Component('localization', 'local_planning_performance_modelling', 'amcl.launch.py', localization_params)
         navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
 
         # add components to launcher
@@ -276,6 +305,7 @@ class BenchmarkRun(object):
         # recorder.launch()  # TODO
         components_launcher.add_component(supervisor)
         components_launcher.add_component(environment)
+        components_launcher.add_component(localization)
         components_launcher.add_component(navigation)
 
         # launch components and wait for the supervisor to finish
@@ -285,7 +315,5 @@ class BenchmarkRun(object):
 
         # make sure remaining components have shutdown
         components_launcher.shutdown()
-        print_info("execute_run: components shutdown completed")
 
         self.log(event="run_end")
-        print_info(f"run {self.run_id} completed")
