@@ -4,6 +4,7 @@ import random
 import time
 import traceback
 
+import geometry_msgs
 import lifecycle_msgs
 import nav_msgs
 import networkx as nx
@@ -21,7 +22,7 @@ from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped
+from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped, PoseWithCovarianceStamped
 from lifecycle_msgs.msg import TransitionEvent
 from rclpy.qos import qos_profile_sensor_data, qos_profile_parameter_events
 from rclpy.time import Time
@@ -77,6 +78,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         # topics, services, actions, entities and frames names
         scan_topic = self.get_parameter('scan_topic').value
         cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        odom_topic = self.get_parameter('odom_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
         goal_pose_topic = self.get_parameter('goal_pose_topic').value
@@ -119,7 +121,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.received_first_scan = False
         self.latest_ground_truth_pose_msg = None
         self.navigation_node_activated = False
-        # self.robot_radius = None
         self.pseudo_random_voronoi_index = None
         self.goal_pose = None
 
@@ -133,6 +134,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         # file paths for benchmark data
         self.estimated_poses_file_path = path.join(self.benchmark_data_folder, "estimated_poses.csv")
         self.estimated_correction_poses_file_path = path.join(self.benchmark_data_folder, "estimated_correction_poses.csv")
+        self.odom_file_path = path.join(self.benchmark_data_folder, "odom.csv")
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
         self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
@@ -142,6 +144,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # pandas dataframes for benchmark data
         self.estimated_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta'])
+        self.estimated_correction_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'cov_x_x', 'cov_x_y', 'cov_y_y', 'cov_theta_theta'])
+        self.odom_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
         self.cmd_vel_df = pd.DataFrame(columns=['t', 'linear_x', 'linear_y', 'linear_z', 'angular_x', 'angular_y', 'angular_z'])
         self.run_data = dict()
@@ -168,6 +172,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
         # setup subscribers
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
+        self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
+        self.create_subscription(Odometry, odom_topic, self.odom_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
         self.create_subscription(TransitionEvent, navigation_transition_event_topic, self.lifecycle_transition_event_callback, qos_profile_parameter_events)
 
@@ -253,6 +259,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
         The only case in which this function is not called is if an exception was raised from self.__init__
         """
         self.estimated_poses_df.to_csv(self.estimated_poses_file_path, index=False)
+        self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
+        self.odom_df.to_csv(self.odom_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
         self.cmd_vel_df.to_csv(self.cmd_vel_file_path, index=False)
 
@@ -355,6 +363,42 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             pass
+
+    def estimated_pose_correction_callback(self, pose_with_covariance_msg: geometry_msgs.msg.PoseWithCovarianceStamped):
+        if not self.run_started:
+            return
+
+        orientation = pose_with_covariance_msg.pose.pose.orientation
+        theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
+        covariance_mat = np.array(pose_with_covariance_msg.pose.covariance).reshape(6, 6)
+
+        self.estimated_correction_poses_df = self.estimated_correction_poses_df.append({
+            't': nanoseconds_to_seconds(Time.from_msg(pose_with_covariance_msg.header.stamp).nanoseconds),
+            'x': pose_with_covariance_msg.pose.pose.position.x,
+            'y': pose_with_covariance_msg.pose.pose.position.y,
+            'theta': theta,
+            'cov_x_x': covariance_mat[0, 0],
+            'cov_x_y': covariance_mat[0, 1],
+            'cov_y_y': covariance_mat[1, 1],
+            'cov_theta_theta': covariance_mat[5, 5]
+        }, ignore_index=True)
+
+    def odom_callback(self, odometry_msg: nav_msgs.msg.Odometry):
+        if not self.run_started:
+            return
+
+        orientation = odometry_msg.pose.pose.orientation
+        theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
+
+        self.odom_df = self.odom_df.append({
+            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
+            'x': odometry_msg.pose.pose.position.x,
+            'y': odometry_msg.pose.pose.position.y,
+            'theta': theta,
+            'v_x': odometry_msg.twist.twist.linear.x,
+            'v_y': odometry_msg.twist.twist.linear.y,
+            'v_theta': odometry_msg.twist.twist.angular.z,
+        }, ignore_index=True)
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         self.latest_ground_truth_pose_msg = odometry_msg
