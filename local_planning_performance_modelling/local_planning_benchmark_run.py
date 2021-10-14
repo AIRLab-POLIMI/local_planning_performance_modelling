@@ -82,6 +82,7 @@ class BenchmarkRun(object):
         backup_file_if_exists(self.run_output_folder)
         os.mkdir(self.run_output_folder)
         os.mkdir(run_configuration_path)
+        self.recorder_output_path = path.join(self.run_output_folder, "all_data_rosbag2_record")
 
         # components original configuration paths
         components_configurations_folder = path.expanduser(self.benchmark_configuration['components_configurations_folder'])
@@ -287,6 +288,10 @@ class BenchmarkRun(object):
             'use_sim_time': self.use_sim_time
         }
 
+        recorder_params = {
+            'recorder_output_path': self.recorder_output_path,
+        }
+
         environment_params = {
             'urdf': self.robot_realistic_urdf_path,
             'world': self.gazebo_world_model_path,
@@ -309,14 +314,15 @@ class BenchmarkRun(object):
 
         # declare components
         supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', supervisor_params)
+        recorder = Component('recorder', 'local_planning_performance_modelling', 'recorder.launch.py', recorder_params)
         environment = Component('environment', 'local_planning_performance_modelling', 'environment.launch.py', environment_params)
         localization = Component('localization', 'local_planning_performance_modelling', 'amcl.launch.py', localization_params)
         navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
 
         # add components to launcher
         components_launcher = ComponentsLauncher()
-        # recorder.launch()  # TODO
         components_launcher.add_component(supervisor)
+        # components_launcher.add_component(recorder)  # TODO uncomment before running on server
         components_launcher.add_component(environment)
         components_launcher.add_component(localization)
         components_launcher.add_component(navigation)
