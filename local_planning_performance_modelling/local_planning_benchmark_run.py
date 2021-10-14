@@ -51,12 +51,19 @@ class BenchmarkRun(object):
         global_planner_node = self.run_parameters['global_planner_node']
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
-        wheelbase = self.benchmark_configuration['hunter2_wheelbase'] if 'max_steering_angle_deg' in self.run_parameters else None
-        min_turning_radius = float(wheelbase/np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
+
+        hunter2_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
+        hunter2_min_turning_radius = float(hunter2_wheelbase/np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
         hunter2_footprint = self.benchmark_configuration['hunter2_footprint']
         hunter2_footprint_string = str(hunter2_footprint)
-        turtlebot_radius = self.benchmark_configuration['turtlebot_radius']
-        max_circumscribing_circle_radius = max(turtlebot_radius, float(np.max(np.fabs(np.array(hunter2_footprint)))))  # largest radius for any robot's circumscribing circle
+
+        turtlebot_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
+        turtlebot_min_turning_radius = float(hunter2_wheelbase / np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
+        turtlebot_footprint = self.benchmark_configuration['turtlebot_footprint']
+        turtlebot_footprint_string = str(turtlebot_footprint)
+
+        max_circumscribing_circle_radius = max(float(np.max(np.fabs(np.array(turtlebot_footprint)))),
+                                               float(np.max(np.fabs(np.array(hunter2_footprint)))))  # largest radius for any robot's circumscribing circle
         goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
@@ -145,8 +152,8 @@ class BenchmarkRun(object):
         nav2_navigation_configuration['map_server']['ros__parameters']['yaml_filename'] = self.map_info_file_path
         nav2_navigation_configuration['bt_navigator']['ros__parameters']['default_bt_xml_filename'] = behaviour_tree_configuration_path
         if robot_model == 'turtlebot3_waffle_performance_modelling':
-            nav2_navigation_configuration['local_costmap']['local_costmap']['ros__parameters']['robot_radius'] = turtlebot_radius
-            nav2_navigation_configuration['global_costmap']['global_costmap']['ros__parameters']['robot_radius'] = turtlebot_radius
+            nav2_navigation_configuration['local_costmap']['local_costmap']['ros__parameters']['footprint'] = turtlebot_footprint_string
+            nav2_navigation_configuration['global_costmap']['global_costmap']['ros__parameters']['footprint'] = turtlebot_footprint_string
         elif robot_model == 'hunter2':
             nav2_navigation_configuration['local_costmap']['local_costmap']['ros__parameters']['footprint'] = hunter2_footprint_string
             nav2_navigation_configuration['global_costmap']['global_costmap']['ros__parameters']['footprint'] = hunter2_footprint_string
@@ -166,7 +173,12 @@ class BenchmarkRun(object):
         with open(original_global_planner_configuration_path) as global_planner_configuration_file:
             global_planner_configuration = yaml.safe_load(global_planner_configuration_file)
         if global_planner_node == 'smac':
-            global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = min_turning_radius
+            if robot_model == 'turtlebot3_waffle_performance_modelling':
+                global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = turtlebot_min_turning_radius
+            elif robot_model == 'hunter2':
+                global_planner_configuration['planner_server']['ros__parameters']['GridBased']['minimum_turning_radius'] = hunter2_min_turning_radius
+            else:
+                raise ValueError()
         if not path.exists(path.dirname(self.global_planner_configuration_path)):
             os.makedirs(path.dirname(self.global_planner_configuration_path))
         with open(self.global_planner_configuration_path, 'w') as global_planner_configuration_file:
@@ -176,17 +188,18 @@ class BenchmarkRun(object):
         with open(original_local_planner_configuration_path) as local_planner_configuration_file:
             local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
         if local_planner_node == 'teb':
-            if min_turning_radius is not None:
-                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = min_turning_radius
             if robot_model == 'turtlebot3_waffle_performance_modelling':
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = False
-                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "circular"
-                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.radius'] = turtlebot_radius
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.vertices'] = turtlebot_footprint_string
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = turtlebot_wheelbase
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = turtlebot_min_turning_radius
             elif robot_model == 'hunter2':
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
-                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = wheelbase
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.vertices'] = hunter2_footprint_string
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = hunter2_wheelbase
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = hunter2_min_turning_radius
             else:
                 raise ValueError()
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
