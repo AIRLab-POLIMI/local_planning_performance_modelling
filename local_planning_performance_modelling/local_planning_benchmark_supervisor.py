@@ -71,6 +71,9 @@ class LocalPlanningBenchmarkSupervisor(Node):
     def __init__(self):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
+        # Debug variable
+        self.prevent_shutdown = False  # if true, runs will never end
+
         # topics, services, actions, entities and frames names
         scan_topic = self.get_parameter('scan_topic').value
         cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
@@ -263,7 +266,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
         if not goal_handle.accepted:
             print_error('navigation action goal rejected')
             self.write_event('navigation_goal_rejected')
-            rclpy.shutdown()
+            if not self.prevent_shutdown:
+                rclpy.shutdown()
             return
 
         self.write_event('navigation_goal_accepted')
@@ -291,7 +295,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.write_event('navigation_failed')
 
         self.write_event('run_completed')
-        rclpy.shutdown()
+        if not self.prevent_shutdown:
+            rclpy.shutdown()
 
     def lifecycle_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time
@@ -302,7 +307,8 @@ class LocalPlanningBenchmarkSupervisor(Node):
     def run_timeout_callback(self):
         print_error("terminating supervisor due to timeout, terminating run")
         self.write_event('run_timeout')
-        rclpy.shutdown()
+        if not self.prevent_shutdown:
+            rclpy.shutdown()
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
