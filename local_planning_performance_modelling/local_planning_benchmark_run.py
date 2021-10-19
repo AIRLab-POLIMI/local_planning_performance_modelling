@@ -79,6 +79,7 @@ class BenchmarkRun(object):
         # prepare folder structure
         run_configuration_path = path.join(self.run_output_folder, "components_configuration")
         run_info_file_path = path.join(self.run_output_folder, "run_info.yaml")
+        self.run_completed_file_path = path.join(self.run_output_folder, "RUN_COMPLETED")
         backup_file_if_exists(self.run_output_folder)
         os.mkdir(self.run_output_folder)
         os.mkdir(run_configuration_path)
@@ -334,5 +335,8 @@ class BenchmarkRun(object):
 
         # make sure remaining components have shutdown
         components_launcher.shutdown()
+
+        with open(self.run_completed_file_path, 'w') as f:
+            pass
 
         self.log(event="run_end")

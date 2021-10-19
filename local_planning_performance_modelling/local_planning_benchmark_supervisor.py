@@ -445,22 +445,24 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ps_snapshot_count += 1
 
     def init_run_events_file(self):
-        backup_file_if_exists(self.run_events_file_path)
         try:
             with open(self.run_events_file_path, 'w') as run_events_file:
-                run_events_file.write("{t}, {event}\n".format(t='timestamp', event='event'))
+                run_events_file.write("t, real_time, event\n")
         except IOError as e:
             self.get_logger().error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
             self.get_logger().error(e)
+            print_error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
+            print_error(e)
 
     def write_event(self, event):
         ros_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
         real_time = time.time()
         event_string = f"t: {ros_time}, real_time: {real_time}, event: {str(event)}"
+        event_csv_line = f"{ros_time}, {real_time}, {str(event)}\n"
         print_info(event_string)
         try:
             with open(self.run_events_file_path, 'a') as run_events_file:
-                run_events_file.write(event_string+'\n')
+                run_events_file.write(event_csv_line)
         except IOError as e:
             self.get_logger().error(f"write_event: could not write event to run_events_file: {event_string}")
             self.get_logger().error(e)
