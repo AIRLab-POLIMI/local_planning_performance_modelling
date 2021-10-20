@@ -25,7 +25,8 @@ def generate_launch_description():
 
         DeclareLaunchArgument('params_file', description='Full path to the ROS2 parameters file to use for all launched nodes'),
         DeclareLaunchArgument('rviz_config_file', description='Full path to the RVIZ config file to use'),
-        DeclareLaunchArgument('headless', description='Whether to execute gzclient)'),
+        DeclareLaunchArgument('launch_rviz', description='Whether to execute gzclient)'),
+        DeclareLaunchArgument('launch_gzclient', description='Whether to execute gzclient)'),
 
         DeclareLaunchArgument('world', description='Full path to world model file to load'),
         DeclareLaunchArgument('gazebo_model_path_env_var', description='GAZEBO_MODEL_PATH environment variable'),
@@ -34,7 +35,7 @@ def generate_launch_description():
         SetEnvironmentVariable('GAZEBO_MODEL_PATH', LaunchConfiguration('gazebo_model_path_env_var')),
         SetEnvironmentVariable('GAZEBO_PLUGIN_PATH', LaunchConfiguration('gazebo_plugin_path_env_var')),
         ExecuteProcess(cmd=['gzserver', '-s', 'libgazebo_ros_init.so', LaunchConfiguration('world'), '--verbose', '-s', 'libgazebo_ros_factory.so'], cwd=[launch_dir], output='screen'),
-        ExecuteProcess(cmd=['gzclient'], condition=IfCondition(PythonExpression(['not ', LaunchConfiguration('headless')])), cwd=[launch_dir], output='screen'),
+        ExecuteProcess(cmd=['gzclient'], condition=IfCondition(LaunchConfiguration('launch_gzclient')), cwd=[launch_dir], output='screen'),
 
         Node(
             package='robot_state_publisher',
@@ -45,7 +46,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
-            # condition=IfCondition(PythonExpression(['not ', headless])),  # TODO uncomment before running on server
+            condition=IfCondition(LaunchConfiguration('launch_rviz')),
             launch_arguments={'rviz_config_file': LaunchConfiguration('rviz_config_file')}.items()),
 
     ])

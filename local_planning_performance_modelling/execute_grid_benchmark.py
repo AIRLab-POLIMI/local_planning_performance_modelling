@@ -65,13 +65,18 @@ def main():
                         action='store_true',
                         required=False)
 
-    parser.add_argument('--gui', dest='gui',
-                        help='When set the components are run with GUI (opposite of headless).',
+    parser.add_argument('--rviz', dest='rviz',
+                        help='When set rviz is launched.',
                         action='store_true',
                         required=False)
 
-    parser.add_argument('-s', '--show-ros-info', dest='show_ros_info',
-                        help='When set the component nodes are launched with output="screen".',
+    parser.add_argument('--gzclient', dest='gzclient',
+                        help='When set gzclient is launched.',
+                        action='store_true',
+                        required=False)
+
+    parser.add_argument('--do-not-record', dest='do_not_record',
+                        help='When set the rosbag recording is not launched.',
                         action='store_true',
                         required=False)
 
@@ -93,6 +98,5 @@ def main():
                            num_runs=args.num_runs,
                            ignore_executed_params_combinations=args.ignore_previous_runs,
                            shuffle=not args.no_shuffle,
-                           headless=not args.gui,
-                           show_ros_info=args.show_ros_info)
+                           args_parser=args)
 

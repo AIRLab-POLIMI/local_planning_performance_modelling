@@ -37,7 +37,7 @@ import psutil
 import os
 from os import path
 
-from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, nanoseconds_to_seconds
+from performance_modelling_py.utils import print_info, print_error, nanoseconds_to_seconds
 from std_srvs.srv import Empty
 
 

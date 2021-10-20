@@ -18,7 +18,7 @@ from performance_modelling_py.component_proxies.ros2_component import Component,
 
 
 class BenchmarkRun(object):
-    def __init__(self, run_id, run_output_folder, benchmark_log_path, environment_folder, parameters_combination_dict, benchmark_configuration_dict, show_ros_info, headless):
+    def __init__(self, run_id, run_output_folder, benchmark_log_path, environment_folder, parameters_combination_dict, benchmark_configuration_dict, show_ros_info, headless, args_parser):
 
         # run configuration
         self.run_id = run_id
@@ -27,7 +27,9 @@ class BenchmarkRun(object):
         self.run_parameters = parameters_combination_dict
         self.benchmark_configuration = benchmark_configuration_dict
         self.components_ros_output = 'screen' if show_ros_info else 'log'
-        self.headless = headless
+        self.launch_rviz = args_parser.rviz
+        self.launch_gzclient = args_parser.gzclient
+        self.do_not_record = args_parser.do_not_record
         self.use_sim_time = True
 
         # environment parameters
@@ -296,7 +298,8 @@ class BenchmarkRun(object):
         environment_params = {
             'urdf': self.robot_realistic_urdf_path,
             'world': self.gazebo_world_model_path,
-            'headless': self.headless,
+            'launch_rviz': self.launch_rviz,
+            'launch_gzclient': self.launch_gzclient,
             'gazebo_model_path_env_var': self.gazebo_model_path_env_var,
             'gazebo_plugin_path_env_var': self.gazebo_plugin_path_env_var,
             'params_file': self.nav2_navigation_configuration_path,
@@ -323,7 +326,8 @@ class BenchmarkRun(object):
         # add components to launcher
         components_launcher = ComponentsLauncher()
         components_launcher.add_component(supervisor)
-        # components_launcher.add_component(recorder)  # TODO uncomment before running on server
+        if not self.do_not_record:
+            components_launcher.add_component(recorder)
         components_launcher.add_component(environment)
         components_launcher.add_component(localization)
         components_launcher.add_component(navigation)
