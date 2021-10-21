@@ -18,7 +18,7 @@ from performance_modelling_py.component_proxies.ros2_component import Component,
 
 
 class BenchmarkRun(object):
-    def __init__(self, run_id, run_output_folder, benchmark_log_path, environment_folder, parameters_combination_dict, benchmark_configuration_dict, show_ros_info, headless, args_parser):
+    def __init__(self, run_id, run_output_folder, benchmark_log_path, environment_folder, parameters_combination_dict, benchmark_configuration_dict, args_parser):
 
         # run configuration
         self.run_id = run_id
@@ -26,7 +26,6 @@ class BenchmarkRun(object):
         self.benchmark_log_path = benchmark_log_path
         self.run_parameters = parameters_combination_dict
         self.benchmark_configuration = benchmark_configuration_dict
-        self.components_ros_output = 'screen' if show_ros_info else 'log'
         self.launch_rviz = args_parser.rviz
         self.launch_gzclient = args_parser.gzclient
         self.do_not_record = args_parser.do_not_record
