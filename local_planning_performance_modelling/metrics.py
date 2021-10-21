@@ -10,7 +10,80 @@ from os import path
 import numpy as np
 import pandas as pd
 
-from performance_modelling_py.utils import print_error
+from performance_modelling_py.utils import print_error, print_info
+
+
+class InterpolationException(Exception):
+    pass
+
+
+def interpolate_pose_2d_trajectories(trajectory_a_df, trajectory_b_df, trajectory_a_label='a', trajectory_b_label='b', average_rate=1.0, interpolation_tolerance=0.1):
+    a = trajectory_a_label
+    b = trajectory_b_label
+
+    trajectory_a_df['t_datetime'] = pd.to_datetime(trajectory_a_df['t'], unit='s')
+    trajectory_b_df['t_datetime'] = pd.to_datetime(trajectory_b_df['t'], unit='s')
+
+    trajectory_a_df_len = len(trajectory_a_df['t'])
+    if trajectory_a_df_len < 2:
+        raise InterpolationException(f"trajectory {a} has less than 2 poses")
+
+    trajectory_a_rate = trajectory_a_df_len/(trajectory_a_df['t'][trajectory_a_df_len - 1] - trajectory_a_df['t'][0])
+    trajectory_a_rate_limited_df = trajectory_a_df.iloc[::max(1, int(trajectory_a_rate / average_rate)), :]
+
+    # interpolate trajectory_b around trajectory_a timestamps
+    tolerance = pd.Timedelta('{}s'.format(interpolation_tolerance))
+    forward_matches = pd.merge_asof(
+        left=trajectory_a_rate_limited_df[['t_datetime', 't', 'x', 'y', 'theta']],
+        right=trajectory_b_df[['t_datetime', 't', 'x', 'y', 'theta']],
+        on='t_datetime',
+        direction='forward',
+        tolerance=tolerance,
+        suffixes=(f'_{a}', f'_{b}'))
+    backward_matches = pd.merge_asof(
+        left=trajectory_a_rate_limited_df[['t_datetime', 't', 'x', 'y', 'theta']],
+        right=trajectory_b_df[['t_datetime', 't', 'x', 'y', 'theta']],
+        on='t_datetime',
+        direction='backward',
+        tolerance=tolerance,
+        suffixes=(f'_{a}', f'_{b}'))
+    forward_backward_matches = pd.merge(
+        left=backward_matches,
+        right=forward_matches,
+        on=f't_{a}')
+
+    interpolated_trajectory_b_list = list()
+    for index, row in forward_backward_matches.iterrows():
+        t_b_1, t_b_2 = row[f't_{b}_x'], row[f't_{b}_y']
+        t_int = row[f't_{a}']
+
+        # if the trajectory_a time is too far from a trajectory_b time (before or after), do not use this trajectory_a data point
+        if pd.isnull(t_b_1) or pd.isnull(t_b_2):
+            continue
+
+        x_a = row[f'x_{a}_x']
+        x_b_1, x_b_2 = row[f'x_{b}_x'], row[f'x_{b}_y']
+        x_int = np.interp(t_int, [t_b_1, t_b_2], [x_b_1, x_b_2])
+
+        y_a = row[f'y_{a}_x']
+        y_b_1, y_b_2 = row[f'y_{b}_x'], row[f'y_{b}_y']
+        y_int = np.interp(t_int, [t_b_1, t_b_2], [y_b_1, y_b_2])
+
+        theta_a = row[f'theta_{a}_x']
+        theta_b_1, theta_b_2 = row[f'theta_{b}_x'], row[f'theta_{b}_y']
+        theta_int = np.interp(t_int, [t_b_1, t_b_2], [theta_b_1, theta_b_2])
+
+        interpolated_trajectory_b_list.append({
+            't': t_int,
+            f'x_{a}': x_a,
+            f'y_{a}': y_a,
+            f'theta_{a}': theta_a,
+            f'x_{b}': x_int,
+            f'y_{b}': y_int,
+            f'theta_{b}': theta_int,
+        })
+
+    return pd.DataFrame(interpolated_trajectory_b_list)
 
 
 class TrajectoryLength:
@@ -31,26 +104,26 @@ class TrajectoryLength:
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
-            print_error(f"{self.metric_name}: ground_truth_poses file not found {self.ground_truth_poses_file_path}")
+            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
             return False
 
         if not path.isfile(self.run_events_file_path):
-            print_error(f"{self.metric_name}: run_events file not found {self.run_events_file_path}")
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
 
-        # get waypoint timestamps info from run events
+        # get timestamps info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
         navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error("event navigation_goal_accepted not in events file")
+            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
             return False
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error("events navigation_succeeded and navigation_failed not in events file")
-            return True
+            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            return False
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -88,22 +161,22 @@ class ExecutionTime:
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
-            print_error(f"{self.metric_name}: run_events file not found {self.run_events_file_path}")
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
 
-        # get waypoint timestamps info from run events
+        # get timestamps info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
         navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error("event navigation_goal_accepted not in events file")
+            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
             return False
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error("events navigation_succeeded and navigation_failed not in events file")
-            return True
+            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            return False
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -131,10 +204,10 @@ class SuccessRate:
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
-            print_error(f"{self.metric_name}: run_events file not found {self.run_events_file_path}")
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
 
-        # get waypoint timestamps info from run events
+        # get events info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_goal_reached_events = run_events_df[run_events_df.event == 'navigation_goal_reached']
 
@@ -162,13 +235,13 @@ class CpuTimeAndMaxMemoryUsage:
 
         # check required files exist
         if not path.isdir(self.ps_snapshots_folder_path):
-            print_error(f"{self.metric_name}: ps_snapshots directory not found {self.ps_snapshots_folder_path}")
+            print_error(f"{self.metric_name}: ps_snapshots directory not found:\n{self.ps_snapshots_folder_path}")
             return False
 
         ps_snapshot_files_path = path.join(self.ps_snapshots_folder_path, "ps_*.pkl")
         ps_snapshot_paths_list = sorted(glob.glob(ps_snapshot_files_path))
         if len(ps_snapshot_paths_list) == 0:
-            print_error(f"{self.metric_name}: ps_snapshot files not found {ps_snapshot_files_path}")
+            print_error(f"{self.metric_name}: ps_snapshot files not found:\n{ps_snapshot_files_path}")
             return False
 
         cpu_time_dict = defaultdict(int)
@@ -179,7 +252,7 @@ class CpuTimeAndMaxMemoryUsage:
                 with open(ps_snapshot_path, 'rb') as ps_snapshot_file:
                     ps_snapshot = pickle.load(ps_snapshot_file)
             except (EOFError, pickle.UnpicklingError) as e:
-                print_error(f"{self.metric_name}: Could not load pickled ps snapshot. Error: {type(e)} {e}. Pickle file: {ps_snapshot_path}")
+                print_error(f"{self.metric_name}: Could not load pickled ps snapshot. Error: {type(e)} {e}. Pickle file:\n{ps_snapshot_path}")
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
@@ -194,7 +267,7 @@ class CpuTimeAndMaxMemoryUsage:
                     )
 
         if len(cpu_time_dict) == 0 or len(max_memory_dict) == 0:
-            print_error(f"{self.metric_name}: no data from ps snapshots {ps_snapshot_files_path}")
+            print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
             return False
 
         self.results_df["controller_cpu_time"] = [cpu_time_dict["controller_server"]]
@@ -206,4 +279,141 @@ class CpuTimeAndMaxMemoryUsage:
         self.results_df["system_max_memory"] = [sum(max_memory_dict.values())]
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
+        return True
+
+
+class OdometryError:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+        self.results_df = results_df
+        self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
+        self.odometry_poses_file_path = path.join(run_output_folder, "benchmark_data", "odom.csv")
+        self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.recompute_anyway = recompute_anyway
+        self.metric_name = "odometry_error"
+        self.version = None
+
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # check required files exist
+        if not path.isfile(self.ground_truth_poses_file_path):
+            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
+            return False
+
+        if not path.isfile(self.odometry_poses_file_path):
+            print_error(f"{self.metric_name}: odometry_poses file not found:\n{self.odometry_poses_file_path}")
+            return False
+
+        if not path.isfile(self.localization_update_poses_file_path):
+            print_error(f"{self.metric_name}: estimated_localization_update_poses file not found:\n{self.localization_update_poses_file_path}")
+            return False
+
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        # get timestamps info from run events
+        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
+        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
+        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
+        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
+
+        if len(navigation_start_events) != 1:
+            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            return False
+
+        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
+            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            return False
+
+        navigation_start_time = navigation_start_events.iloc[0].t
+        navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
+
+        # get the dataframes for ground truth poses
+        ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
+        ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
+
+        # get the dataframes for odom poses
+        odom_poses_df = pd.read_csv(self.odometry_poses_file_path)
+        odom_poses_df = odom_poses_df[(navigation_start_time <= odom_poses_df.t) & (odom_poses_df.t <= navigation_end_time)]
+
+        if len(odom_poses_df) == 0:
+            print_info(f"{self.metric_name}: not enough odom poses in:\n{self.odometry_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            self.results_df[self.metric_name] = [np.nan]
+            return True
+
+        # get the dataframes for localization update poses
+        localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
+        localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
+        localization_update_timestamps_pairs = zip(list(localization_update_timestamps[0:-1]), list(localization_update_timestamps[1:]))
+
+        metric_results_per_waypoint = dict()
+        metric_results_per_waypoint_list = list()
+
+        # compute the interpolated ground truth poses
+        try:
+            interpolated_df = interpolate_pose_2d_trajectories(
+                trajectory_a_df=odom_poses_df, trajectory_a_label='odom',
+                trajectory_b_df=ground_truth_poses_df, trajectory_b_label='gt',
+                average_rate=10.0,
+            )
+        except InterpolationException as e:
+            print(odom_poses_df)
+            print_info(f"{self.metric_name}: interpolation exception: {e} when interpolating:\n{self.ground_truth_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            self.results_df[self.metric_name] = [np.nan]
+            return True
+
+        # if not enough matching ground truth data points are found, the metrics can not be computed
+        if len(interpolated_df.index) < 2:
+            print_info(f"{self.metric_name}: no matching ground truth data points were found when interpolating:\n{self.ground_truth_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            self.results_df[self.metric_name] = [np.nan]
+            return True
+
+        for start_timestamp, end_timestamp in localization_update_timestamps_pairs:
+            assert (start_timestamp < end_timestamp)
+
+            # get start pose and end pose that most closely matches start and end times
+            interpolated_ground_truth_prev_waypoint = interpolated_df[(interpolated_df.t < start_timestamp)].iloc[-1]
+            odom_start_pose = interpolated_ground_truth_prev_waypoint[['x_odom', 'y_odom', 'theta_odom']].values
+            ground_truth_start_pose = interpolated_ground_truth_prev_waypoint[['x_gt', 'y_gt', 'theta_gt']].values
+            absolute_translation_error_start = np.sqrt((ground_truth_start_pose[0] - odom_start_pose[0]) ** 2 + (ground_truth_start_pose[1] - odom_start_pose[1]) ** 2)
+            absolute_rotation_error_start = np.abs(ground_truth_start_pose[2] - odom_start_pose[2])
+
+            interpolated_ground_truth_df_clipped = interpolated_df[(start_timestamp <= interpolated_df.t) & (interpolated_df.t <= end_timestamp)]
+            if len(interpolated_ground_truth_df_clipped) == 0:
+                print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval ({start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
+                continue
+
+            interpolated_ground_truth_df_end_pose = interpolated_ground_truth_df_clipped.iloc[-1]
+            odom_end_pose = interpolated_ground_truth_df_end_pose[['x_odom', 'y_odom', 'theta_odom']].values
+            ground_truth_end_pose = interpolated_ground_truth_df_end_pose[['x_gt', 'y_gt', 'theta_gt']].values
+            absolute_translation_error_end = np.sqrt((ground_truth_end_pose[0] - odom_end_pose[0]) ** 2 + (ground_truth_end_pose[1] - odom_end_pose[1]) ** 2)
+            absolute_rotation_error_end = np.abs(ground_truth_end_pose[2] - odom_end_pose[2])
+
+            waypoint_relative_localization_error = {
+
+                'absolute_translation_error_start': float(absolute_translation_error_start),
+                'absolute_rotation_error_start': float(absolute_rotation_error_start),
+
+                'absolute_translation_error_end': float(absolute_translation_error_end),
+                'absolute_rotation_error_end': float(absolute_rotation_error_end),
+
+                'start_time': start_timestamp,
+                'end_time': end_timestamp,
+            }
+
+            metric_results_per_waypoint_list.append(waypoint_relative_localization_error)
+
+        metric_results_per_waypoint['absolute_error_per_waypoint_list'] = metric_results_per_waypoint_list
+
+        # self.results_df[f"{self.metric_name}_version"] = [self.version]
+        # self.results_df[self.metric_name] = [float(odometry_error)]
         return True

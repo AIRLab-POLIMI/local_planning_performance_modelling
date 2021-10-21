@@ -14,7 +14,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from performance_modelling_py.utils import print_info, print_error
-from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate
+from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError
 
 import pandas as pd
 
@@ -49,13 +49,14 @@ def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
     TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    # TODO localization update rate, localization update error, odometry error
+    OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
+    # TODO localization update rate, localization update error
 
     results_df.to_csv(metrics_result_file_path, index=False)
 
 
 def parallel_compute_metrics(run_output_folder, recompute_all_metrics):
-    print_info("start : compute_metrics {:3d}% {}".format(int((shared_progress.value + 1) * 100 / shared_num_runs.value), path.basename(run_output_folder)))
+    print("start : compute_metrics {:3d}% {}".format(int((shared_progress.value + 1) * 100 / shared_num_runs.value), path.basename(run_output_folder)))
 
     # noinspection PyBroadException
     try:
@@ -68,7 +69,7 @@ def parallel_compute_metrics(run_output_folder, recompute_all_metrics):
         print_error(traceback.format_exc())
 
     shared_progress.value += 1
-    print_info("finish: compute_metrics {:3d}% {}".format(int(shared_progress.value * 100 / shared_num_runs.value), path.basename(run_output_folder)))
+    print("finish: compute_metrics {:3d}% {}".format(int(shared_progress.value * 100 / shared_num_runs.value), path.basename(run_output_folder)))
 
 
 def main():
