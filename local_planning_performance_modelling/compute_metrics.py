@@ -10,48 +10,33 @@ import os
 import sys
 import traceback
 from os import path
-import yaml
-from yaml.constructor import ConstructorError
+import pandas as pd
 
 from performance_modelling_py.utils import print_info, print_error
 from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError
 
-import pandas as pd
-
 
 def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
-    run_id = path.basename(run_output_folder)
-    run_info_path = path.join(run_output_folder, "run_info.yaml")
-    if not path.exists(run_info_path) or not path.isfile(run_info_path):
-        print_error("run info file does not exists")
-        return
 
-    try:
-        with open(run_info_path) as run_info_file:
-            run_info = yaml.safe_load(run_info_file)
-    except ConstructorError:
-        print_error("Could not parse run_info.yaml for run {}".format(run_id))
-        return
-
-    # output files
+    # open the existing metrics file or make a new data frame
     metrics_result_folder_path = path.join(run_output_folder, "metric_results")
-    metrics_result_file_path = path.join(metrics_result_folder_path, "metrics.csv")
-
     if not path.exists(metrics_result_folder_path):
         os.makedirs(metrics_result_folder_path)
-
+    metrics_result_file_path = path.join(metrics_result_folder_path, "metrics.csv")
     if path.exists(metrics_result_file_path):
         results_df = pd.read_csv(metrics_result_file_path)
     else:
         results_df = pd.DataFrame()
 
+    # compute metrics
     CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    # TODO localization update rate, localization update error (odometry error is done)
+    # TODO localization update rate, localization update error
 
+    # write the metrics data frame to file
     results_df.to_csv(metrics_result_file_path, index=False)
 
 
@@ -124,7 +109,7 @@ def main():
         pool.starmap(parallel_compute_metrics, zip(run_folders, [args.recompute_all_metrics] * num_runs))
 
 
-shared_progress = None
-shared_num_runs = None
+shared_progress = multiprocessing.Value('i', 0)
+shared_num_runs = multiprocessing.Value('i', 0)
 if __name__ == '__main__':
     main()
