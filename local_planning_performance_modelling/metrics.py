@@ -10,6 +10,7 @@ from os import path
 import numpy as np
 import pandas as pd
 
+from performance_modelling_py.metrics.localization_metrics import get_matrix_diff
 from performance_modelling_py.utils import print_error, print_info
 
 
@@ -291,7 +292,7 @@ class OdometryError:
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
         self.metric_name = "odometry_error"
-        self.version = None
+        self.version = 1
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -299,6 +300,16 @@ class OdometryError:
                 f"{self.metric_name}_version" in self.results_df and \
                 self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
             return True
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df["odometry_error_alpha_1_mean"] = [np.nan]
+        self.results_df["odometry_error_alpha_1_std"] = [np.nan]
+        self.results_df["odometry_error_alpha_2_mean"] = [np.nan]
+        self.results_df["odometry_error_alpha_2_std"] = [np.nan]
+        self.results_df["odometry_error_alpha_3_mean"] = [np.nan]
+        self.results_df["odometry_error_alpha_3_std"] = [np.nan]
+        self.results_df["odometry_error_alpha_4_mean"] = [np.nan]
+        self.results_df["odometry_error_alpha_4_std"] = [np.nan]
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
@@ -343,9 +354,8 @@ class OdometryError:
         odom_poses_df = odom_poses_df[(navigation_start_time <= odom_poses_df.t) & (odom_poses_df.t <= navigation_end_time)]
 
         if len(odom_poses_df) == 0:
-            print_info(f"{self.metric_name}: not enough odom poses in:\n{self.odometry_poses_file_path}")
+            print_info(f"{self.metric_name}: not enough odom poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.odometry_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
-            self.results_df[self.metric_name] = [np.nan]
             return True
 
         # get the dataframes for localization update poses
@@ -353,67 +363,82 @@ class OdometryError:
         localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
         localization_update_timestamps_pairs = zip(list(localization_update_timestamps[0:-1]), list(localization_update_timestamps[1:]))
 
-        metric_results_per_waypoint = dict()
-        metric_results_per_waypoint_list = list()
-
         # compute the interpolated ground truth poses
         try:
             interpolated_df = interpolate_pose_2d_trajectories(
                 trajectory_a_df=odom_poses_df, trajectory_a_label='odom',
                 trajectory_b_df=ground_truth_poses_df, trajectory_b_label='gt',
-                average_rate=10.0,
+                average_rate=10.0, interpolation_tolerance=0.1
             )
         except InterpolationException as e:
-            print(odom_poses_df)
             print_info(f"{self.metric_name}: interpolation exception: {e} when interpolating:\n{self.ground_truth_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
-            self.results_df[self.metric_name] = [np.nan]
             return True
 
         # if not enough matching ground truth data points are found, the metrics can not be computed
         if len(interpolated_df.index) < 2:
             print_info(f"{self.metric_name}: no matching ground truth data points were found when interpolating:\n{self.ground_truth_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
-            self.results_df[self.metric_name] = [np.nan]
             return True
 
+        odom_errors_alpha_1 = list()
+        odom_errors_alpha_2 = list()
+        odom_errors_alpha_3 = list()
+        odom_errors_alpha_4 = list()
         for start_timestamp, end_timestamp in localization_update_timestamps_pairs:
             assert (start_timestamp < end_timestamp)
 
             # get start pose and end pose that most closely matches start and end times
-            interpolated_ground_truth_prev_waypoint = interpolated_df[(interpolated_df.t < start_timestamp)].iloc[-1]
-            odom_start_pose = interpolated_ground_truth_prev_waypoint[['x_odom', 'y_odom', 'theta_odom']].values
-            ground_truth_start_pose = interpolated_ground_truth_prev_waypoint[['x_gt', 'y_gt', 'theta_gt']].values
-            absolute_translation_error_start = np.sqrt((ground_truth_start_pose[0] - odom_start_pose[0]) ** 2 + (ground_truth_start_pose[1] - odom_start_pose[1]) ** 2)
-            absolute_rotation_error_start = np.abs(ground_truth_start_pose[2] - odom_start_pose[2])
-
-            interpolated_ground_truth_df_clipped = interpolated_df[(start_timestamp <= interpolated_df.t) & (interpolated_df.t <= end_timestamp)]
-            if len(interpolated_ground_truth_df_clipped) == 0:
-                print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval ({start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
+            interpolated_df_clipped = interpolated_df[(start_timestamp <= interpolated_df.t) & (interpolated_df.t <= end_timestamp)]
+            if len(interpolated_df_clipped) == 0:
+                print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
                 continue
+            interpolated_start_poses = interpolated_df[(interpolated_df.t < start_timestamp)].iloc[-1]
+            interpolated_end_poses = interpolated_df_clipped.iloc[-1]
 
-            interpolated_ground_truth_df_end_pose = interpolated_ground_truth_df_clipped.iloc[-1]
-            odom_end_pose = interpolated_ground_truth_df_end_pose[['x_odom', 'y_odom', 'theta_odom']].values
-            ground_truth_end_pose = interpolated_ground_truth_df_end_pose[['x_gt', 'y_gt', 'theta_gt']].values
-            absolute_translation_error_end = np.sqrt((ground_truth_end_pose[0] - odom_end_pose[0]) ** 2 + (ground_truth_end_pose[1] - odom_end_pose[1]) ** 2)
-            absolute_rotation_error_end = np.abs(ground_truth_end_pose[2] - odom_end_pose[2])
+            # compute odom transform from start to end
+            odom_start_pose = interpolated_start_poses[['x_odom', 'y_odom', 'theta_odom']].values
+            odom_end_pose = interpolated_end_poses[['x_odom', 'y_odom', 'theta_odom']].values
+            odom_transform_hc = get_matrix_diff(odom_start_pose, odom_end_pose)
+            odom_relative_pose = np.array([odom_transform_hc[0, 2], odom_transform_hc[1, 2], np.arctan2(odom_transform_hc[1, 0], odom_transform_hc[0, 0])])
 
-            waypoint_relative_localization_error = {
+            # compute ground truth transform from start to end
+            ground_truth_start_pose = interpolated_start_poses[['x_gt', 'y_gt', 'theta_gt']].values
+            ground_truth_end_pose = interpolated_end_poses[['x_gt', 'y_gt', 'theta_gt']].values
+            ground_truth_transform = get_matrix_diff(ground_truth_start_pose, ground_truth_end_pose)
+            ground_truth_relative_pose = np.array([ground_truth_transform[0, 2], ground_truth_transform[1, 2], np.arctan2(ground_truth_transform[1, 0], ground_truth_transform[0, 0])])
 
-                'absolute_translation_error_start': float(absolute_translation_error_start),
-                'absolute_rotation_error_start': float(absolute_rotation_error_start),
+            # compute relative transform between ground truth and odom
+            relative_error_transform_hc = get_matrix_diff(ground_truth_relative_pose, odom_relative_pose)
+            relative_error_x, relative_error_y, relative_error_theta = relative_error_transform_hc[0, 2], relative_error_transform_hc[1, 2], np.arctan2(relative_error_transform_hc[1, 0], relative_error_transform_hc[0, 0])
+            relative_translation_error = np.sqrt(relative_error_x ** 2 + relative_error_y ** 2)
+            relative_rotation_error = np.abs(np.arctan2(np.sin(relative_error_theta), np.cos(relative_error_theta)))
 
-                'absolute_translation_error_end': float(absolute_translation_error_end),
-                'absolute_rotation_error_end': float(absolute_rotation_error_end),
+            # compute the integral of translation between updates
+            ground_truth_positions = interpolated_df_clipped[['x_gt', 'y_gt']].values
+            squared_deltas = (ground_truth_positions[1:-1] - ground_truth_positions[0:-2]) ** 2  # equivalent to (x_2-x_1)**2, (y_2-y_1)**2, for each row
+            trajectory_translation = np.sqrt(np.sum(squared_deltas, axis=1)).sum()  # equivalent to sum for each row of sqrt( (x_2-x_1)**2 + (y_2-y_1)**2 )
 
-                'start_time': start_timestamp,
-                'end_time': end_timestamp,
-            }
+            # compute the integral of rotation between updates
+            ground_truth_rotations = interpolated_df_clipped['theta_gt'].values
+            rotation_differences = ground_truth_rotations[1:-1] - ground_truth_rotations[0:-2]
+            rotation_deltas = np.abs(np.arctan2(np.sin(rotation_differences), np.cos(rotation_differences)))
+            trajectory_rotation = np.sum(rotation_deltas)
 
-            metric_results_per_waypoint_list.append(waypoint_relative_localization_error)
+            if trajectory_rotation > 0.01:  # only compute this errors if there was a meaningful rotation (0.01rad =~ 0.6deg)
+                odom_errors_alpha_1.append(relative_rotation_error/trajectory_rotation)
+                odom_errors_alpha_4.append(relative_translation_error/trajectory_rotation)
+            if trajectory_translation > 0.01:  # only compute this errors if there was a meaningful translation (1cm)
+                odom_errors_alpha_2.append(relative_rotation_error/trajectory_translation)
+                odom_errors_alpha_3.append(relative_translation_error/trajectory_translation)
 
-        metric_results_per_waypoint['absolute_error_per_waypoint_list'] = metric_results_per_waypoint_list
-
-        # self.results_df[f"{self.metric_name}_version"] = [self.version]
-        # self.results_df[self.metric_name] = [float(odometry_error)]
+        self.results_df["odometry_error_alpha_1_mean"] = [float(np.mean(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
+        self.results_df["odometry_error_alpha_1_std"] = [float(np.std(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
+        self.results_df["odometry_error_alpha_2_mean"] = [float(np.mean(odom_errors_alpha_2)) if len(odom_errors_alpha_2) else np.nan]
+        self.results_df["odometry_error_alpha_2_std"] = [float(np.std(odom_errors_alpha_2)) if len(odom_errors_alpha_2) else np.nan]
+        self.results_df["odometry_error_alpha_3_mean"] = [float(np.mean(odom_errors_alpha_3)) if len(odom_errors_alpha_3) else np.nan]
+        self.results_df["odometry_error_alpha_3_std"] = [float(np.std(odom_errors_alpha_3)) if len(odom_errors_alpha_3) else np.nan]
+        self.results_df["odometry_error_alpha_4_mean"] = [float(np.mean(odom_errors_alpha_4)) if len(odom_errors_alpha_4) else np.nan]
+        self.results_df["odometry_error_alpha_4_std"] = [float(np.std(odom_errors_alpha_4)) if len(odom_errors_alpha_4) else np.nan]
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True

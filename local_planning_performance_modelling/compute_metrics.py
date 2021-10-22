@@ -50,7 +50,7 @@ def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
     ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    # TODO localization update rate, localization update error
+    # TODO localization update rate, localization update error (odometry error is done)
 
     results_df.to_csv(metrics_result_file_path, index=False)
 
