@@ -13,7 +13,7 @@ from os import path
 import pandas as pd
 
 from performance_modelling_py.utils import print_info, print_error
-from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError
+from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, LocalizationUpdateRate
 
 
 def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
@@ -34,7 +34,12 @@ def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
     ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
     OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    # TODO localization update rate, localization update error
+    LocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
+    LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
+
+    # pd.options.display.width = 220
+    # pd.options.display.max_columns = None
+    # print(results_df[[x for x in results_df.columns if 'localization_' in x or 'odometry_' in x]])
 
     # write the metrics data frame to file
     results_df.to_csv(metrics_result_file_path, index=False)
