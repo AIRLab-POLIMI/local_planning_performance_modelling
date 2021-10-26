@@ -428,10 +428,12 @@ class LocalPlanningBenchmarkSupervisor(Node):
             except psutil.NoSuchProcess:  # processes may have died, causing this exception to be raised from psutil.Process.as_dict
                 continue
             try:
-                # delete uninteresting values
+                # delete uninteresting values and add time information
                 del process_copy['connections']
                 del process_copy['memory_maps']
                 del process_copy['environ']
+                process_copy['realtime_stamp'] = time.time()
+                process_copy['rostime_stamp'] = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
 
                 processes_dicts_list.append(process_copy)
             except KeyError:

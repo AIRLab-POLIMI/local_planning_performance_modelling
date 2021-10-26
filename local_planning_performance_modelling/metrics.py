@@ -252,16 +252,24 @@ class CpuTimeAndMaxMemoryUsage:
                 self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
             return True
 
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df["controller_cpu_time"] = [np.nan]
+        self.results_df["planner_cpu_time"] = [np.nan]
+        self.results_df["system_cpu_time"] = [np.nan]
+        self.results_df["controller_max_memory"] = [np.nan]
+        self.results_df["planner_max_memory"] = [np.nan]
+        self.results_df["system_max_memory"] = [np.nan]
+
         # check required files exist
         if not path.isdir(self.ps_snapshots_folder_path):
-            print_error(f"{self.metric_name}: ps_snapshots directory not found:\n{self.ps_snapshots_folder_path}")
-            return False
+            print_info(f"{self.metric_name}: ps_snapshots directory not found:\n{self.ps_snapshots_folder_path}")
+            return True
 
         ps_snapshot_files_path = path.join(self.ps_snapshots_folder_path, "ps_*.pkl")
         ps_snapshot_paths_list = sorted(glob.glob(ps_snapshot_files_path))
         if len(ps_snapshot_paths_list) == 0:
-            print_error(f"{self.metric_name}: ps_snapshot files not found:\n{ps_snapshot_files_path}")
-            return False
+            print_info(f"{self.metric_name}: ps_snapshot files not found:\n{ps_snapshot_files_path}")
+            return True
 
         cpu_time_dict = defaultdict(int)
         max_memory_dict = defaultdict(int)
@@ -275,7 +283,7 @@ class CpuTimeAndMaxMemoryUsage:
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
-                if process_name not in ['gzserver', 'gzclient', 'rviz2', 'local_planning_', ]:  # ignore simulator and rviz to count the robot system memory
+                if process_name not in ['gzserver', 'gzclient', 'rviz2', 'local_planning_']:  # ignore simulator and rviz to count the robot system memory
                     cpu_time_dict[process_name] = max(
                         cpu_time_dict[process_name],
                         process_info['cpu_times'].user + process_info['cpu_times'].system
