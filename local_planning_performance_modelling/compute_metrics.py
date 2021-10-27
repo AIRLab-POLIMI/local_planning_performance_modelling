@@ -20,7 +20,7 @@ from performance_modelling_py.utils import print_info, print_error
 from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, LocalizationUpdateRate
 
 
-def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
+def compute_run_metrics(run_output_folder):
 
     # open the existing metrics file or make a new data frame
     metrics_result_folder_path = path.join(run_output_folder, "metric_results")
@@ -59,14 +59,15 @@ def compute_run_metrics(run_output_folder, recompute_all_metrics=False):
     return results_df, list(run_info['run_parameters'].keys())
 
 
-def parallel_compute_metrics(run_output_folder, recompute_all_metrics):
-    print(f"start : compute_metrics {int((shared_progress.value + 1) * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
+def parallel_compute_metrics(run_output_folder):
+    if not silent:
+        print(f"start : compute_metrics {int((shared_progress.value + 1) * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
 
     results_df = None
     run_parameter_names = None
     # noinspection PyBroadException
     try:
-        results_df, run_parameter_names = compute_run_metrics(run_output_folder, recompute_all_metrics=recompute_all_metrics)
+        results_df, run_parameter_names = compute_run_metrics(run_output_folder)
     except KeyboardInterrupt:
         print_info(f"parallel_compute_metrics: metrics computation interrupted (run {run_output_folder})")
         sys.exit()
@@ -75,7 +76,8 @@ def parallel_compute_metrics(run_output_folder, recompute_all_metrics):
         print_error(traceback.format_exc())
 
     shared_progress.value += 1
-    print(f"finish: compute_metrics {int(shared_progress.value * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
+    if not silent:
+        print(f"finish: compute_metrics {int(shared_progress.value * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
     return results_df, run_parameter_names
 
 
@@ -107,6 +109,11 @@ def main():
                         default=default_num_parallel_threads,
                         required=False)
 
+    parser.add_argument('-s', dest='silent',
+                        help='When set, reduce printed output.',
+                        action='store_true',
+                        required=False)
+
     args = parser.parse_args()
 
     if args.output_dir_path is None:
@@ -126,15 +133,14 @@ def main():
         return path.isdir(p) and not path.exists(path.join(p, "RUN_COMPLETED"))
 
     run_folders = list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder))))
-    not_completed_run_folders = list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder))))
-    num_runs = len(run_folders)
-
-    if len(not_completed_run_folders):
-        print_info("Runs not completed:")
-        for not_completed_run_folder in not_completed_run_folders:
-            print(not_completed_run_folder)
+    not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
 
     if len(run_folders) == 0:
+        if len(not_completed_run_folders):
+            print_info("Runs not completed:")
+            for not_completed_run_folder in not_completed_run_folders:
+                print(not_completed_run_folder)
+
         print_info("Nothing to do.")
         sys.exit(0)
 
@@ -142,15 +148,20 @@ def main():
     shared_progress = multiprocessing.Value('i', 0)
     global shared_num_runs
     shared_num_runs = multiprocessing.Value('i', len(run_folders))
+    global silent
+    silent = args.silent
+    global recompute_all_metrics
+    recompute_all_metrics = args.recompute_all_metrics
+
     with multiprocessing.Pool(processes=args.num_parallel_threads) as pool:
         try:
-            results_dfs_and_parameter_names = pool.starmap(parallel_compute_metrics, zip(run_folders, [args.recompute_all_metrics] * num_runs))
+            results_dfs_and_parameter_names = pool.starmap(parallel_compute_metrics, zip(run_folders))
         except KeyboardInterrupt:
             print_info("main: metrics computation interrupted")
             sys.exit()
 
         results_dfs, run_parameter_names_lists = zip(*results_dfs_and_parameter_names)
-        print("done.")
+        print_info("finished computing metrics")
 
         all_results_df = pd.concat(filter(lambda d: d is not None, results_dfs), sort=False)
         all_results_df.to_csv(results_path, index=False)
@@ -159,8 +170,16 @@ def main():
         results_info = {'run_parameter_names': run_parameter_names, 'datetime': datetime.now().astimezone().isoformat()}
         with open(results_info_path, 'w') as results_info_file:
             yaml.dump(results_info, results_info_file)
+        print_info("finished writing results")
+
+    if len(not_completed_run_folders):
+        print_info("runs not completed:")
+        for not_completed_run_folder in not_completed_run_folders:
+            print("\t" + not_completed_run_folder)
 
 
+silent = False
+recompute_all_metrics = False
 shared_progress = multiprocessing.Value('i', 0)
 shared_num_runs = multiprocessing.Value('i', 0)
 if __name__ == '__main__':
