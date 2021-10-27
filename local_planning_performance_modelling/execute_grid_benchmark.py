@@ -29,7 +29,7 @@ def main():
     parser.add_argument('-p', dest='benchmark_configuration_from_package',
                         help=f'Yaml file with the configuration of the benchmark relative to the config/benchmark_configurations folder in this package. If set, the option "benchmark_configuration" will be ignored.'
                              f' Defaults to {default_benchmark_configuration_from_package}. Available configuration files:\n' +
-                             '\n'.join(os.listdir(benchmark_configurations_dir_path)),
+                             '\n'.join(sorted(os.listdir(benchmark_configurations_dir_path))),
                         type=str,
                         default=None,
                         required=False)
