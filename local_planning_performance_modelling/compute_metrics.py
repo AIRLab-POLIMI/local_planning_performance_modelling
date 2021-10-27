@@ -156,14 +156,15 @@ def main():
     with multiprocessing.Pool(processes=args.num_parallel_threads) as pool:
         try:
             results_dfs_and_parameter_names = pool.starmap(parallel_compute_metrics, zip(run_folders))
+            print_info("finished computing metrics")
         except KeyboardInterrupt:
             print_info("main: metrics computation interrupted")
             sys.exit()
 
         results_dfs, run_parameter_names_lists = zip(*results_dfs_and_parameter_names)
-        print_info("finished computing metrics")
+        results_dfs, run_parameter_names_lists = filter(lambda d: d is not None, results_dfs), filter(lambda x: x is not None, run_parameter_names_lists)
 
-        all_results_df = pd.concat(filter(lambda d: d is not None, results_dfs), sort=False)
+        all_results_df = pd.concat(results_dfs, sort=False)
         all_results_df.to_csv(results_path, index=False)
         run_parameter_names = list(set(reduce(list.__add__, run_parameter_names_lists)))
 
