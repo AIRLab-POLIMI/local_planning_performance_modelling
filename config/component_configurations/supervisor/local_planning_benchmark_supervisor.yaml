@@ -14,7 +14,7 @@ local_planning_benchmark_supervisor:
     cmd_vel_topic: /cmd_vel
     estimated_pose_correction_topic: /amcl_pose
     odom_topic: /odom
-    ground_truth_pose_topic: /odom
+    ground_truth_pose_topic: /ground_truth_odom
     goal_pose_topic: /goal_pose
     navigation_transition_event_topic: /bt_navigator/transition_event
 

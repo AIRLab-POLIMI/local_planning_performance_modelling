@@ -13,7 +13,7 @@ from os import path
 import numpy as np
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
-from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error
+from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
 from performance_modelling_py.component_proxies.ros2_component import Component, ComponentsLauncher
 
 
@@ -47,6 +47,7 @@ class BenchmarkRun(object):
 
         self.run_index = self.run_parameters['run_index']
         robot_model = self.run_parameters['robot_model']
+        alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['alpha_1'], self.run_parameters['alpha_2'], self.run_parameters['alpha_3'], self.run_parameters['alpha_4'] = self.run_parameters['odometry_error']
         localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
@@ -223,7 +224,15 @@ class BenchmarkRun(object):
         gazebo_robot_model_sdf_root = gazebo_robot_model_sdf_tree.getroot()
 
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frame_name")[0].text = "base_scan"
-        gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "1"
+        if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "1"
+        else:
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometry_source")[0].text = "2"
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha1")[0].text = str(alpha_1)
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha2")[0].text = str(alpha_2)
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha3")[0].text = str(alpha_3)
+            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha4")[0].text = str(alpha_4)
+
         if robot_model == 'hunter2':
             gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/max_steer")[0].text = str(max_steering_rad*1.1)
         if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):

@@ -119,7 +119,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.terminate = False
         self.ps_snapshot_count = 0
         self.received_first_scan = False
-        self.latest_ground_truth_pose_msg = None
+        self.latest_estimated_position = None
         self.navigation_node_activated = False
         self.pseudo_random_voronoi_index = None
         self.goal_pose = None
@@ -290,14 +290,19 @@ class LocalPlanningBenchmarkSupervisor(Node):
         if status == GoalStatus.STATUS_SUCCEEDED:
             self.write_event('navigation_succeeded')
             goal_position = self.goal_pose.pose.position
-            current_position = self.latest_ground_truth_pose_msg.pose.pose.position
-            distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
-            if distance_from_goal < self.goal_tolerance:
-                self.write_event('navigation_goal_reached')
+            if self.latest_estimated_position is not None:
+                current_position = self.latest_estimated_position
+                distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
+                if distance_from_goal < self.goal_tolerance:
+                    self.write_event('navigation_goal_reached')
+                else:
+                    print_error("goal status succeeded but current position farther from goal position than tolerance")
+                    self.write_event('navigation_goal_not_reached')
             else:
-                print_error("goal status succeeded but current position farther from goal position than tolerance")
-                self.write_event('navigation_goal_not_reached')
-
+                print_error("estimated position not set")
+                self.write_event('estimated_position_not_received')
+                if not self.prevent_shutdown:
+                    rclpy.shutdown()
         else:
             print_info('navigation action failed with status {}'.format(status))
             self.write_event('navigation_failed')
@@ -351,6 +356,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
     def write_estimated_pose_timer_callback(self):
         try:
             transform_msg = self.tf_buffer.lookup_transform(self.fixed_frame, self.robot_base_frame, Time())
+            self.latest_estimated_position = transform_msg.transform.translation  # save the latest position to check if the robot has reached the goal within tolerance
             orientation = transform_msg.transform.rotation
             theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
@@ -401,7 +407,6 @@ class LocalPlanningBenchmarkSupervisor(Node):
         }, ignore_index=True)
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
-        self.latest_ground_truth_pose_msg = odometry_msg
         if not self.run_started:
             return
 
