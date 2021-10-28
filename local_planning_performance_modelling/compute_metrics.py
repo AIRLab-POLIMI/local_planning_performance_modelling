@@ -46,17 +46,26 @@ def compute_run_metrics(run_output_folder):
         results_df[run_parameter] = [run_parameter_value]
 
     # compute metrics
-    CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    LocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
-    LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics).compute()
+    metrics_to_compute = [
+        CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        LocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+    ]
+
+    success = True
+    for m in metrics_to_compute:
+        if not m.compute():
+            success = False
+            print_error(f"compute_run_metrics: failed metrics computation for run {run_output_folder}")
+            break
 
     # write the metrics data frame to file
     results_df.to_csv(metrics_result_file_path, index=False)
-    return results_df, list(run_info['run_parameters'].keys())
+    return (results_df, list(run_info['run_parameters'].keys())) if success else (None, None)
 
 
 def parallel_compute_metrics(run_output_folder):
