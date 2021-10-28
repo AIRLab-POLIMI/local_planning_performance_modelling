@@ -20,6 +20,13 @@ def generate_launch_description():
             value='1'),
 
         DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
+        DeclareLaunchArgument(
             'params_file',
             description='Full path to the ROS2 parameters file to use'),
 
@@ -27,14 +34,14 @@ def generate_launch_description():
             package='nav2_planner',
             executable='planner_server',
             name='planner_server',
-            output='screen',
+            output='both',
             parameters=[params_file]),
 
         Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
             name='lifecycle_manager_navigation_gp',
-            output='screen',
+            output='both',
             parameters=[{'autostart': True},
                         {'node_names': lifecycle_nodes}]),
 

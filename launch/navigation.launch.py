@@ -25,6 +25,13 @@ def generate_launch_description():
             value='1'),
 
         DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
+        DeclareLaunchArgument(
             'local_planner_params_file',
             description='Full path to the ROS2 parameters file to use for the local planner (controller server)'),
         DeclareLaunchArgument(
@@ -39,7 +46,7 @@ def generate_launch_description():
             package='nav2_controller',
             executable='controller_server',
             name='controller_server',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('local_planner_params_file'), LaunchConfiguration('nav_params_file')]),
 
         # Global planner
@@ -47,7 +54,7 @@ def generate_launch_description():
             package='nav2_planner',
             executable='planner_server',
             name='planner_server',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('global_planner_params_file'), LaunchConfiguration('nav_params_file')]),
 
         # Rest of the navigation stack
@@ -55,25 +62,25 @@ def generate_launch_description():
             package='nav2_recoveries',
             executable='recoveries_server',
             name='recoveries_server',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('nav_params_file')]),
         Node(
             package='nav2_map_server',
             executable='map_server',
             name='map_server',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('nav_params_file')]),
         Node(
             package='nav2_bt_navigator',
             executable='bt_navigator',
             name='bt_navigator',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('nav_params_file')]),
         Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
             name='lifecycle_manager',
-            output='screen',
+            output='both',
             parameters=[{'node_names': lifecycle_nodes},
                         {'autostart': True}]),
 

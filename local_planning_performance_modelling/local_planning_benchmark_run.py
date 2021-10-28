@@ -47,7 +47,7 @@ class BenchmarkRun(object):
 
         self.run_index = self.run_parameters['run_index']
         robot_model = self.run_parameters['robot_model']
-        alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['alpha_1'], self.run_parameters['alpha_2'], self.run_parameters['alpha_3'], self.run_parameters['alpha_4'] = self.run_parameters['odometry_error']
+        alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
         localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
@@ -86,6 +86,8 @@ class BenchmarkRun(object):
         os.mkdir(self.run_output_folder)
         os.mkdir(run_configuration_path)
         self.recorder_output_path = path.join(self.run_output_folder, "all_data_rosbag2_record")
+        self.ros_log_directory = path.join(self.run_output_folder, "logs")
+        os.mkdir(self.ros_log_directory)
 
         # components original configuration paths
         components_configurations_folder = path.expanduser(self.benchmark_configuration['components_configurations_folder'])
@@ -296,11 +298,12 @@ class BenchmarkRun(object):
 
         supervisor_params = {
             'configuration': self.supervisor_configuration_path,
-            'use_sim_time': self.use_sim_time
+            'log_path': self.ros_log_directory,
         }
 
         recorder_params = {
             'recorder_output_path': self.recorder_output_path,
+            'log_path': self.ros_log_directory,
         }
 
         environment_params = {
@@ -311,17 +314,20 @@ class BenchmarkRun(object):
             'gazebo_model_path_env_var': self.gazebo_model_path_env_var,
             'gazebo_plugin_path_env_var': self.gazebo_plugin_path_env_var,
             'params_file': self.nav2_navigation_configuration_path,
-            'rviz_config_file': self.original_rviz_configuration_path
+            'rviz_config_file': self.original_rviz_configuration_path,
+            'log_path': self.ros_log_directory,
         }
 
         localization_params = {
             'localization_params_file': self.localization_configuration_path,
+            'log_path': self.ros_log_directory,
         }
 
         navigation_params = {
             'local_planner_params_file': self.local_planner_configuration_path,
             'global_planner_params_file': self.global_planner_configuration_path,
             'nav_params_file': self.nav2_navigation_configuration_path,
+            'log_path': self.ros_log_directory,
         }
 
         # declare components

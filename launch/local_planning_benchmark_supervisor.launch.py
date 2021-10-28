@@ -11,7 +11,7 @@ def generate_launch_description():
         package='local_planning_performance_modelling',
         executable='local_planning_benchmark_supervisor',
         name='local_planning_benchmark_supervisor',
-        output='screen',
+        output='both',
         emulate_tty=True,
         parameters=[LaunchConfiguration('configuration')],
     )
@@ -25,6 +25,13 @@ def generate_launch_description():
         SetEnvironmentVariable(
             name='RCUTILS_COLORIZED_OUTPUT',
             value='1'),
+
+        DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
 
         DeclareLaunchArgument(
             'configuration',

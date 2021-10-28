@@ -1,5 +1,6 @@
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable
+from launch.actions import SetEnvironmentVariable, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -15,12 +16,19 @@ def generate_launch_description():
             name='RCUTILS_COLORIZED_OUTPUT',
             value='1'),
 
+        DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
         # Localization
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             name='gt_odom_static_transform_publisher',
-            output='log',
+            output='both',
             arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 
     ])

@@ -23,6 +23,13 @@ def generate_launch_description():
             name='RCUTILS_COLORIZED_OUTPUT',
             value='1'),
 
+        DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
         DeclareLaunchArgument('params_file', description='Full path to the ROS2 parameters file to use for all launched nodes'),
         DeclareLaunchArgument('rviz_config_file', description='Full path to the RVIZ config file to use'),
         DeclareLaunchArgument('launch_rviz', description='Whether to execute gzclient)'),
@@ -41,7 +48,7 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
-            output='screen',
+            output='both',
             arguments=[LaunchConfiguration('urdf')]),
 
         IncludeLaunchDescription(

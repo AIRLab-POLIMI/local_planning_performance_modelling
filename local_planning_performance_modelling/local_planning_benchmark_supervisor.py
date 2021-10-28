@@ -183,7 +183,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
-        print_info("waiting simulator and navigation stack")
+        print_info("waiting simulator and navigation stack", logger=self.get_logger().info)
 
         # wait to receive sensor data from the environment (e.g., a simulator may need time to startup) and for the navigation stack to activate
         waiting_time = 0.0
@@ -249,7 +249,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         """
         This function is called when the node receives an interrupt signal (KeyboardInterrupt).
         """
-        print_info("asked to shutdown, terminating run")
+        print_info("asked to shutdown, terminating run", logger=self.get_logger().info)
         self.write_event('ros_shutdown')
         self.write_event('supervisor_finished')
 
@@ -272,7 +272,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # if the goal is rejected try with the next goal
         if not goal_handle.accepted:
-            print_error('navigation action goal rejected')
+            self.get_logger().error('navigation action goal rejected')
             self.write_event('navigation_goal_rejected')
             if not self.prevent_shutdown:
                 rclpy.shutdown()
@@ -296,15 +296,15 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 if distance_from_goal < self.goal_tolerance:
                     self.write_event('navigation_goal_reached')
                 else:
-                    print_error("goal status succeeded but current position farther from goal position than tolerance")
+                    self.get_logger().error("goal status succeeded but current position farther from goal position than tolerance")
                     self.write_event('navigation_goal_not_reached')
             else:
-                print_error("estimated position not set")
+                self.get_logger().fatal("estimated position not set")
                 self.write_event('estimated_position_not_received')
                 if not self.prevent_shutdown:
                     rclpy.shutdown()
         else:
-            print_info('navigation action failed with status {}'.format(status))
+            print_info('navigation action failed with status {}'.format(status), logger=self.get_logger().info)
             self.write_event('navigation_failed')
 
         self.write_event('run_completed')
@@ -318,7 +318,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.write_event("navigation_node_activated")
 
     def run_timeout_callback(self):
-        print_error("terminating supervisor due to timeout, terminating run")
+        self.get_logger().error("terminating supervisor due to timeout, terminating run")
         self.write_event('run_timeout')
         if not self.prevent_shutdown:
             rclpy.shutdown()
@@ -447,7 +447,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             with open(ps_snapshot_file_path, 'wb') as ps_snapshot_file:
                 pickle.dump(processes_dicts_list, ps_snapshot_file)
         except TypeError:
-            print_error(traceback.format_exc())
+            self.get_logger().error(traceback.format_exc())
 
         self.ps_snapshot_count += 1
 
@@ -458,15 +458,13 @@ class LocalPlanningBenchmarkSupervisor(Node):
         except IOError as e:
             self.get_logger().error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
             self.get_logger().error(e)
-            print_error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
-            print_error(e)
 
     def write_event(self, event):
         ros_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
         real_time = time.time()
         event_string = f"t: {ros_time}, real_time: {real_time}, event: {str(event)}"
         event_csv_line = f"{ros_time}, {real_time}, {str(event)}\n"
-        print_info(event_string)
+        print_info(event_string, logger=self.get_logger().info)
         try:
             with open(self.run_events_file_path, 'a') as run_events_file:
                 run_events_file.write(event_csv_line)
@@ -480,6 +478,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.get_logger().warning(f'supervisor: still waiting {service_client.srv_name} to become available')
             time_waited += warning_timeout
             if time_waited >= fail_timeout:
+                self.get_logger().error(f'{service_client.srv_name} was not available')
                 raise RunFailException(f"{service_client.srv_name} was not available")
 
         srv_future = service_client.call_async(request)

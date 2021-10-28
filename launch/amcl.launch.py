@@ -21,6 +21,13 @@ def generate_launch_description():
             value='1'),
 
         DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
+        DeclareLaunchArgument(
             'localization_params_file',
             description='Full path to the ROS2 parameters file to use for the localization nodes'),
 
@@ -29,13 +36,13 @@ def generate_launch_description():
             package='nav2_amcl',
             executable='amcl',
             name='amcl',
-            output='screen',
+            output='both',
             parameters=[LaunchConfiguration('localization_params_file')]),
         Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
             name='lifecycle_manager_localization',
-            output='screen',
+            output='both',
             parameters=[{'node_names': lifecycle_nodes},
                         {'autostart': True}]),
 

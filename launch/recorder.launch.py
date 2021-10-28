@@ -16,11 +16,18 @@ def generate_launch_description():
             value='1'),
 
         DeclareLaunchArgument(
+            'log_path',
+            description='Log path for this run'),
+        SetEnvironmentVariable(
+            name='ROS_LOG_DIR',
+            value=LaunchConfiguration('log_path')),
+
+        DeclareLaunchArgument(
             'recorder_output_path',
             description='Full path of the created bag files'),
 
         # Recorder command
         ExecuteProcess(
-            cmd=['ros2', 'bag', 'record', '--compression-mode', 'file', '--compression-format', 'zstd', '-a', '-o', LaunchConfiguration('recorder_output_path')], output='screen'),
+            cmd=['ros2', 'bag', 'record', '--compression-mode', 'file', '--compression-format', 'zstd', '-a', '-o', LaunchConfiguration('recorder_output_path')], output='both'),
 
     ])
