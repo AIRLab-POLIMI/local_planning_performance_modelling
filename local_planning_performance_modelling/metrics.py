@@ -130,6 +130,9 @@ class TrajectoryLength:
             print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
 
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
+
         # get timestamps info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
@@ -137,12 +140,14 @@ class TrajectoryLength:
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -183,6 +188,9 @@ class ExecutionTime:
             print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
 
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
+
         # get timestamps info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
@@ -190,12 +198,14 @@ class ExecutionTime:
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -225,6 +235,9 @@ class SuccessRate:
         if not path.isfile(self.run_events_file_path):
             print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
 
         # get events info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
@@ -263,12 +276,14 @@ class CpuTimeAndMaxMemoryUsage:
         # check required files exist
         if not path.isdir(self.ps_snapshots_folder_path):
             print_info(f"{self.metric_name}: ps_snapshots directory not found:\n{self.ps_snapshots_folder_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
 
         ps_snapshot_files_path = path.join(self.ps_snapshots_folder_path, "ps_*.pkl")
         ps_snapshot_paths_list = sorted(glob.glob(ps_snapshot_files_path))
         if len(ps_snapshot_paths_list) == 0:
             print_info(f"{self.metric_name}: ps_snapshot files not found:\n{ps_snapshot_files_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
 
         cpu_time_dict = defaultdict(int)
@@ -361,12 +376,14 @@ class OdometryError:
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -515,12 +532,14 @@ class LocalizationError:
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
@@ -656,12 +675,14 @@ class LocalizationUpdateRate:
         navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
 
         if len(navigation_start_events) != 1:
-            print_error(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_error(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            return False
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
 
         navigation_start_time = navigation_start_events.iloc[0].t
         navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
