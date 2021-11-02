@@ -187,14 +187,19 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # wait to receive sensor data from the environment (e.g., a simulator may need time to startup) and for the navigation stack to activate
         waiting_time = 0.0
+        total_waiting_time = 0.0
         waiting_period = 0.5
         while not self.received_first_scan and not self.navigation_node_activated and rclpy.ok():
             time.sleep(waiting_period)
             rclpy.spin_once(self)
             waiting_time += waiting_period
+            total_waiting_time += waiting_period
             if waiting_time > 5.0:
-                self.get_logger().warning('still waiting to receive first sensor message from environment and navigation to be activated')
+                self.get_logger().warning("still waiting to receive first sensor message from environment and navigation to be activated")
                 waiting_time = 0.0
+            if total_waiting_time > 60.0:
+                self.get_logger().fatal("timed out waiting to receive first sensor message from environment and navigation to be activated")
+                raise RunFailException("timed out waiting to receive first sensor message from environment and navigation to be activated")
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
