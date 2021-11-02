@@ -47,12 +47,18 @@ class BenchmarkRun(object):
 
         self.run_index = self.run_parameters['run_index']
         robot_model = self.run_parameters['robot_model']
-        alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
         localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
+
+        alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
+        amcl_alpha_factor = self.run_parameters['amcl_alpha_factor']
+        if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
+            amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = self.benchmark_configuration['amcl_ground_truth_alpha']
+        else:
+            amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = amcl_alpha_factor * alpha_1, amcl_alpha_factor * alpha_2, amcl_alpha_factor * alpha_3, amcl_alpha_factor * alpha_4
 
         hunter2_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
         hunter2_min_turning_radius = float(hunter2_wheelbase/np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
@@ -145,8 +151,10 @@ class BenchmarkRun(object):
         with open(original_localization_configuration_path) as localization_configuration_file:
             localization_configuration = yaml.safe_load(localization_configuration_file)
         if localization_node == 'amcl':
-            pass
-            # localization_configuration['amcl']['ros__parameters']['TODO'] = "TODO"
+            localization_configuration['amcl']['ros__parameters']['alpha1'] = amcl_alpha_1
+            localization_configuration['amcl']['ros__parameters']['alpha2'] = amcl_alpha_2
+            localization_configuration['amcl']['ros__parameters']['alpha3'] = amcl_alpha_3
+            localization_configuration['amcl']['ros__parameters']['alpha4'] = amcl_alpha_4
         if not path.exists(path.dirname(self.localization_configuration_path)):
             os.makedirs(path.dirname(self.localization_configuration_path))
         with open(self.localization_configuration_path, 'w') as localization_configuration_file:

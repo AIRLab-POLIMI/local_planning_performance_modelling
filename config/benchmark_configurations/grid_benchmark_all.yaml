@@ -12,6 +12,8 @@ hunter2_footprint: [[0.87, 0.47], [0.87, -0.47], [-0.20, -0.47], [-0.20, 0.47]] 
 turtlebot_wheelbase: 0.177
 turtlebot_footprint: [[0.1185, 0.203], [0.1185, -0.203], [-0.2465, -0.203], [-0.2465, 0.203]]  # padded with 5 cm
 
+amcl_ground_truth_alpha: [0.01, 0.0, 0.01, 0.0]
+
 environment_type: simulation
 
 components_configuration:
@@ -32,28 +34,62 @@ run_index: &id001 [0]
 combinatorial_parameters: [
   {
     robot_model: [hunter2],
-    odometry_error: [[0.0, 0.0, 0.0, 0.0], [0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+    odometry_error: [[0.0, 0.0, 0.0, 0.0]],
+    amcl_alpha_factor: [0],
     localization_node: [amcl],
     local_planner_node: [teb],
     global_planner_node: [smac, navfn],
     max_steering_angle_deg: [20, 40],
     run_index: *id001,
   },
+#  {
+#    robot_model: [hunter2],
+#    odometry_error: [[0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+#    amcl_alpha_factor: [0.5, 1.0, 2.0],
+#    localization_node: [amcl],
+#    local_planner_node: [teb],
+#    global_planner_node: [smac, navfn],
+#    max_steering_angle_deg: [20, 40],
+#    run_index: *id001,
+#  },
+
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
-    odometry_error: [[0.0, 0.0, 0.0, 0.0], [0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+    odometry_error: [[0.0, 0.0, 0.0, 0.0]],
+    amcl_alpha_factor: [0],
     localization_node: [amcl],
     local_planner_node: [teb],
     global_planner_node: [smac, navfn],
     max_steering_angle_deg: [20, 40, 90],
     run_index: *id001,
   },
+#  {
+#    robot_model: [turtlebot3_waffle_performance_modelling],
+#    odometry_error: [[0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+#    amcl_alpha_factor: [0.5, 1.0, 2.0],
+#    localization_node: [amcl],
+#    local_planner_node: [teb],
+#    global_planner_node: [smac, navfn],
+#    max_steering_angle_deg: [20, 40, 90],
+#    run_index: *id001,
+#  },
+
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
-    odometry_error: [[0.0, 0.0, 0.0, 0.0], [0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+    odometry_error: [[0.0, 0.0, 0.0, 0.0]],
+    amcl_alpha_factor: [0],
     localization_node: [amcl],
     local_planner_node: [dwb, rpp],
     global_planner_node: [navfn],
     run_index: *id001,
   },
+#  {
+#    robot_model: [turtlebot3_waffle_performance_modelling],
+#    odometry_error: [[0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+#    amcl_alpha_factor: [0.5, 1.0, 2.0],
+#    localization_node: [amcl],
+#    local_planner_node: [dwb, rpp],
+#    global_planner_node: [navfn],
+#    run_index: *id001,
+#  },
 ]
