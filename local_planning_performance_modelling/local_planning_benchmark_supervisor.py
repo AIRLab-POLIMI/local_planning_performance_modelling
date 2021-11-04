@@ -61,6 +61,7 @@ def main(args=None):
     except RunFailException as e:
         print_error(e)
     except Exception:
+        print_error("main: exception raised during rclpy.spin:")
         print_error(traceback.format_exc())
 
     finally:
@@ -189,7 +190,11 @@ class LocalPlanningBenchmarkSupervisor(Node):
         waiting_time = 0.0
         total_waiting_time = 0.0
         waiting_period = 0.5
-        while not self.received_first_scan and not self.navigation_node_activated and rclpy.ok():
+        while not self.received_first_scan or not self.navigation_node_activated:
+            if not rclpy.ok():
+                self.get_logger().fatal("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
+                raise RunFailException("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
+
             time.sleep(waiting_period)
             rclpy.spin_once(self)
             waiting_time += waiting_period
@@ -200,6 +205,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             if total_waiting_time > 60.0:
                 self.get_logger().fatal("timed out waiting to receive first sensor message from environment and navigation to be activated")
                 raise RunFailException("timed out waiting to receive first sensor message from environment and navigation to be activated")
+        print_info("finished waiting to receive first sensor message from environment and navigation to be activated", logger=self.get_logger().info)
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
@@ -326,7 +332,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.get_logger().error("terminating supervisor due to timeout, terminating run")
         self.write_event('run_timeout')
         if not self.prevent_shutdown:
-            rclpy.shutdown()
+            self.destroy_node()
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
