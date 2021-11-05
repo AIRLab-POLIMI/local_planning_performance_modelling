@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'local_planning_benchmark_supervisor = local_planning_performance_modelling.local_planning_benchmark_supervisor:main',
+            'localization_generator = local_planning_performance_modelling.localization_generator:main',
             'execute_grid_benchmark = local_planning_performance_modelling.execute_grid_benchmark:main',
             'compute_metrics = local_planning_performance_modelling.compute_metrics:main',
             'update_run_parameters = local_planning_performance_modelling.update_run_parameters:main',

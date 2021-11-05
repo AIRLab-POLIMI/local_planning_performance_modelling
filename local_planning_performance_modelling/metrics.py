@@ -394,15 +394,18 @@ class OdometryError:
 
         # get the dataframes for odom poses
         odom_poses_df = pd.read_csv(self.odometry_poses_file_path)
-        odom_poses_df = odom_poses_df[(navigation_start_time <= odom_poses_df.t) & (odom_poses_df.t <= navigation_end_time)]
-
         if len(odom_poses_df) == 0:
             print_info(f"{self.metric_name}: not enough odom poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.odometry_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
+        odom_poses_df = odom_poses_df[(navigation_start_time <= odom_poses_df.t) & (odom_poses_df.t <= navigation_end_time)]
 
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
+        if len(localization_update_poses_df) == 0:
+            print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
         localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
         localization_update_timestamps_pairs = zip(list(localization_update_timestamps[0:-1]), list(localization_update_timestamps[1:]))
 
@@ -550,12 +553,11 @@ class LocalizationError:
 
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
-        localization_update_poses_df = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]
-
         if len(localization_update_poses_df) == 0:
             print_info(f"{self.metric_name}: not enough localization update poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.localization_update_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
+        localization_update_poses_df = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]
 
         # compute the interpolated ground truth poses
         try:
@@ -689,6 +691,10 @@ class LocalizationUpdateRate:
 
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
+        if len(localization_update_poses_df) == 0:
+            print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
         localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
 
         if len(localization_update_timestamps) < 2:

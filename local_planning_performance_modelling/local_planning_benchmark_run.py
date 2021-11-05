@@ -13,7 +13,7 @@ from os import path
 import numpy as np
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
-from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
+from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error
 from performance_modelling_py.component_proxies.ros2_component import Component, ComponentsLauncher
 
 
@@ -47,18 +47,25 @@ class BenchmarkRun(object):
 
         self.run_index = self.run_parameters['run_index']
         robot_model = self.run_parameters['robot_model']
-        localization_node = self.run_parameters['localization_node']
+        self.localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
-
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
-        amcl_alpha_factor = self.run_parameters['amcl_alpha_factor']
-        if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
-            amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = self.benchmark_configuration['amcl_ground_truth_alpha']
+
+        amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = [None]*4
+        localization_generator_update_rate = None
+        if self.localization_node == 'amcl':
+            amcl_alpha_factor = self.run_parameters['amcl_alpha_factor']
+            if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
+                amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = self.benchmark_configuration['amcl_ground_truth_alpha']
+            else:
+                amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = amcl_alpha_factor * alpha_1, amcl_alpha_factor * alpha_2, amcl_alpha_factor * alpha_3, amcl_alpha_factor * alpha_4
+        elif self.localization_node == 'localization_generator':
+            localization_generator_update_rate = self.run_parameters['localization_generator_update_rate']
         else:
-            amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = amcl_alpha_factor * alpha_1, amcl_alpha_factor * alpha_2, amcl_alpha_factor * alpha_3, amcl_alpha_factor * alpha_4
+            raise ValueError()
 
         hunter2_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
         hunter2_min_turning_radius = float(hunter2_wheelbase/np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
@@ -98,7 +105,7 @@ class BenchmarkRun(object):
         # components original configuration paths
         components_configurations_folder = path.expanduser(self.benchmark_configuration['components_configurations_folder'])
         original_supervisor_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['supervisor'])
-        original_localization_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][localization_node])
+        original_localization_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][self.localization_node])
         original_nav2_navigation_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['nav2_navigation'])
         original_behaviour_tree_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['behaviour_tree'])
         self.original_rviz_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['rviz'])
@@ -111,7 +118,7 @@ class BenchmarkRun(object):
 
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
-        localization_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][localization_node])
+        localization_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][self.localization_node])
         nav2_navigation_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['nav2_navigation'])
         behaviour_tree_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['behaviour_tree'])
         local_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][local_planner_node])
@@ -150,11 +157,15 @@ class BenchmarkRun(object):
         # copy the configuration of the localization to the run folder and update its parameters
         with open(original_localization_configuration_path) as localization_configuration_file:
             localization_configuration = yaml.safe_load(localization_configuration_file)
-        if localization_node == 'amcl':
+        if self.localization_node == 'amcl':
             localization_configuration['amcl']['ros__parameters']['alpha1'] = amcl_alpha_1
             localization_configuration['amcl']['ros__parameters']['alpha2'] = amcl_alpha_2
             localization_configuration['amcl']['ros__parameters']['alpha3'] = amcl_alpha_3
             localization_configuration['amcl']['ros__parameters']['alpha4'] = amcl_alpha_4
+        elif self.localization_node == 'localization_generator':
+            localization_configuration['localization_generator']['ros__parameters']['publish_pose_rate'] = localization_generator_update_rate
+        else:
+            raise ValueError()
         if not path.exists(path.dirname(self.localization_configuration_path)):
             os.makedirs(path.dirname(self.localization_configuration_path))
         with open(self.localization_configuration_path, 'w') as localization_configuration_file:
@@ -304,17 +315,16 @@ class BenchmarkRun(object):
     def execute_run(self):
         self.log(event=f"run_start")
 
-        supervisor_params = {
+        # declare components
+        supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', {
             'configuration': self.supervisor_configuration_path,
             'log_path': self.ros_log_directory,
-        }
-
-        recorder_params = {
+        })
+        recorder = Component('recorder', 'local_planning_performance_modelling', 'recorder.launch.py', {
             'recorder_output_path': self.recorder_output_path,
             'log_path': self.ros_log_directory,
-        }
-
-        environment_params = {
+        })
+        environment = Component('environment', 'local_planning_performance_modelling', 'environment.launch.py', {
             'urdf': self.robot_realistic_urdf_path,
             'world': self.gazebo_world_model_path,
             'launch_rviz': self.launch_rviz,
@@ -324,26 +334,17 @@ class BenchmarkRun(object):
             'params_file': self.nav2_navigation_configuration_path,
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
-        }
-
-        localization_params = {
-            'localization_params_file': self.localization_configuration_path,
-            'log_path': self.ros_log_directory,
-        }
-
-        navigation_params = {
+        })
+        navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch.py', {
             'local_planner_params_file': self.local_planner_configuration_path,
             'global_planner_params_file': self.global_planner_configuration_path,
             'nav_params_file': self.nav2_navigation_configuration_path,
             'log_path': self.ros_log_directory,
-        }
-
-        # declare components
-        supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch.py', supervisor_params)
-        recorder = Component('recorder', 'local_planning_performance_modelling', 'recorder.launch.py', recorder_params)
-        environment = Component('environment', 'local_planning_performance_modelling', 'environment.launch.py', environment_params)
-        localization = Component('localization', 'local_planning_performance_modelling', 'amcl.launch.py', localization_params)
-        navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch.py', navigation_params)
+        })
+        localization = Component('localization', 'local_planning_performance_modelling', f'{self.localization_node}.launch.py', {
+            'localization_params_file': self.localization_configuration_path,
+            'log_path': self.ros_log_directory,
+        })
 
         # add components to launcher
         components_launcher = ComponentsLauncher()
@@ -362,7 +363,7 @@ class BenchmarkRun(object):
         # make sure remaining components have shutdown
         components_launcher.shutdown()
 
-        with open(self.run_completed_file_path, 'w') as f:
+        with open(self.run_completed_file_path, 'w') as _:
             pass
 
         self.log(event="run_end")
