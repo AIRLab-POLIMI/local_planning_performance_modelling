@@ -5,17 +5,18 @@ local_planning_benchmark_supervisor:
     initial_pose_std_xy: 0.2
     initial_pose_std_theta: 0.2617
     goal_tolerance: 0.4
-    run_timeout: 10800.0
-    ps_snapshot_period: 10.0
+    run_timeout: 1200.0
+    ps_snapshot_period: 1.0
     write_estimated_poses_period: 0.1
 
     # topic names
     scan_topic: /scan
     cmd_vel_topic: /cmd_vel
     estimated_pose_correction_topic: /amcl_pose
-    ground_truth_pose_topic: /ground_truth/base_footprint/odom
-    initial_pose_topic: /initialpose
-    #localization_node_transition_event_topic: /amcl/transition_event
+    odom_topic: /odom
+    ground_truth_pose_topic: /ground_truth_odom
+    goal_pose_topic: /goal_pose
+    navigation_transition_event_topic: /bt_navigator/transition_event
 
     # service names
     lifecycle_manager_service: /lifecycle_manager/manage_nodes
@@ -26,12 +27,11 @@ local_planning_benchmark_supervisor:
     set_entity_state_service: /set_entity_state
 
     # action names
-    #navigate_to_pose_action: /follow_path
     navigate_to_pose_action: /navigate_to_pose
 
     # frame names
     fixed_frame: map
-    robot_base_frame: base_link_realistic
+    robot_base_frame: base_link
 
     # gazebo entity names
     robot_entity_name: robot  # base_footprint

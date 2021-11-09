@@ -10,4 +10,4 @@ sudo docker build \
   --build-arg user_name="$USER_NAME" \
   --build-arg user_gid="$USER_GID" \
   --build-arg user_group="$USER_GROUP" \
-  -t "$USER_NAME"/local_planning_performance_modelling_maria:v1 .
+  -t "$USER_NAME"/local_planning_performance_modelling:v1 .

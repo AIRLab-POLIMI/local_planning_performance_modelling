@@ -1,0 +1,19 @@
+localization_generator:
+  ros__parameters:
+
+    use_sim_time: True
+
+    # run parameters
+    publish_tf_rate: 50.0
+    update_pose_rate: 1.0
+    translation_error: 0.1
+    rotation_error: 0.1
+
+    # topic names
+    generated_pose_topic: /generated_pose
+    ground_truth_pose_topic: /ground_truth_odom
+
+    # frame names
+    fixed_frame: map
+    odom_frame: odom
+    robot_base_frame: base_footprint

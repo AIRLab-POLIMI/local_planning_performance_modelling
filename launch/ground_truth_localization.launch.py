@@ -1,13 +1,10 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import SetEnvironmentVariable, DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-
-    params_file = LaunchConfiguration('params_file')
-    lifecycle_nodes = ['planner_server']
 
     return LaunchDescription([
 
@@ -26,23 +23,12 @@ def generate_launch_description():
             name='ROS_LOG_DIR',
             value=LaunchConfiguration('log_path')),
 
-        DeclareLaunchArgument(
-            'params_file',
-            description='Full path to the ROS2 parameters file to use'),
-
+        # Localization
         Node(
-            package='nav2_planner',
-            executable='planner_server',
-            name='planner_server',
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='gt_odom_static_transform_publisher',
             output='both',
-            parameters=[params_file]),
-
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager_navigation_gp',
-            output='both',
-            parameters=[{'autostart': True},
-                        {'node_names': lifecycle_nodes}]),
+            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 
     ])

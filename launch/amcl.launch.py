@@ -6,8 +6,9 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    params_file = LaunchConfiguration('params_file')
-    lifecycle_nodes = ['planner_server']
+    lifecycle_nodes = [
+        'amcl',
+    ]
 
     return LaunchDescription([
 
@@ -27,22 +28,22 @@ def generate_launch_description():
             value=LaunchConfiguration('log_path')),
 
         DeclareLaunchArgument(
-            'params_file',
-            description='Full path to the ROS2 parameters file to use'),
+            'localization_params_file',
+            description='Full path to the ROS2 parameters file to use for the localization nodes'),
 
+        # Localization
         Node(
-            package='nav2_planner',
-            executable='planner_server',
-            name='planner_server',
+            package='nav2_amcl',
+            executable='amcl',
+            name='amcl',
             output='both',
-            parameters=[params_file]),
-
+            parameters=[LaunchConfiguration('localization_params_file')]),
         Node(
             package='nav2_lifecycle_manager',
             executable='lifecycle_manager',
-            name='lifecycle_manager_navigation_gp',
+            name='lifecycle_manager_localization',
             output='both',
-            parameters=[{'autostart': True},
-                        {'node_names': lifecycle_nodes}]),
+            parameters=[{'node_names': lifecycle_nodes},
+                        {'autostart': True}]),
 
     ])
