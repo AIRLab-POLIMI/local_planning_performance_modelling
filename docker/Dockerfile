@@ -53,6 +53,7 @@ RUN \
 
 RUN \
   pip3 install pyquaternion && \
+  pip3 install transforms3d && \
   pip3 install networkx && \
   pip3 install scikit-image
 

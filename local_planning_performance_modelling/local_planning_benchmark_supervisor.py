@@ -1,10 +1,8 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import random
 import time
 import traceback
-from collections import defaultdict, deque
 
 import geometry_msgs
 import lifecycle_msgs
@@ -14,21 +12,19 @@ import numpy as np
 import pandas as pd
 import pyquaternion
 import rclpy
+import yaml
 from action_msgs.msg import GoalStatus
-from gazebo_msgs.msg import EntityState
 from gazebo_msgs.srv import SetEntityState
-from lifecycle_msgs.msg import TransitionEvent
 from nav2_msgs.action import NavigateToPose
-from nav2_msgs.action import FollowPath
 from nav2_msgs.srv import ManageLifecycleNodes
-from nav_msgs.msg import Odometry, Path
+from nav_msgs.msg import Odometry
 from performance_modelling_py.environment import ground_truth_map
 from rcl_interfaces.srv import GetParameters
-from rclpy import publisher
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, Pose, Quaternion, PoseStamped
-from rclpy.qos import qos_profile_sensor_data, QoSDurabilityPolicy
+from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped, PoseWithCovarianceStamped
+from lifecycle_msgs.msg import TransitionEvent
+from rclpy.qos import qos_profile_sensor_data, qos_profile_parameter_events
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
 
@@ -41,9 +37,8 @@ import psutil
 import os
 from os import path
 
-from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, nanoseconds_to_seconds
+from performance_modelling_py.utils import print_info, print_error, nanoseconds_to_seconds
 from std_srvs.srv import Empty
-from tf2_ros.buffer_interface import Stamped
 
 
 class RunFailException(Exception):
@@ -66,6 +61,7 @@ def main(args=None):
     except RunFailException as e:
         print_error(e)
     except Exception:
+        print_error("main: exception raised during rclpy.spin:")
         print_error(traceback.format_exc())
 
     finally:
@@ -77,14 +73,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
     def __init__(self):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
+        # Debug variable
+        self.prevent_shutdown = False  # if true, runs will never end
+
         # topics, services, actions, entities and frames names
-        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
-        
         scan_topic = self.get_parameter('scan_topic').value
+        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        odom_topic = self.get_parameter('odom_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
-        initial_pose_topic = self.get_parameter('initial_pose_topic').value
-        #local_planning_node_transition_event_topic = self.get_parameter('local_planning_node_transition_event_topic').value
+        goal_pose_topic = self.get_parameter('goal_pose_topic').value
+        navigation_transition_event_topic = self.get_parameter('navigation_transition_event_topic').value
         lifecycle_manager_service = self.get_parameter('lifecycle_manager_service').value
         global_costmap_get_parameters_service = self.get_parameter('global_costmap_get_parameters_service').value
         pause_physics_service = self.get_parameter('pause_physics_service').value
@@ -102,6 +101,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.ground_truth_map_info_path = self.get_parameter("ground_truth_map_info_path").value
 
         # run parameters
+        self.run_index = self.get_parameter('run_index').value
         run_timeout = self.get_parameter('run_timeout').value
         ps_snapshot_period = self.get_parameter('ps_snapshot_period').value
         write_estimated_poses_period = self.get_parameter('write_estimated_poses_period').value
@@ -113,22 +113,16 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.initial_pose_covariance_matrix[1, 1] = self.get_parameter('initial_pose_std_xy').value**2
         self.initial_pose_covariance_matrix[5, 5] = self.get_parameter('initial_pose_std_theta').value**2
         self.goal_tolerance = self.get_parameter('goal_tolerance').value
+        self.goal_obstacle_min_distance = self.get_parameter('goal_obstacle_min_distance').value
 
         # run variables
         self.run_started = False
         self.terminate = False
         self.ps_snapshot_count = 0
         self.received_first_scan = False
-        self.latest_ground_truth_pose_msg = None
-        self.local_planning_node_activated = False
-        self.robot_radius = None
-        self.initial_pose = None
-        self.current_goal = None
-        self.num_goals = None
-        self.goal_sent_count = 0
-        self.goal_succeeded_count = 0
-        self.goal_failed_count = 0
-        self.goal_rejected_count = 0
+        self.latest_estimated_position = None
+        self.navigation_node_activated = False
+        self.pseudo_random_voronoi_index = None
         self.goal_pose = None
 
         # prepare folder structure
@@ -141,26 +135,26 @@ class LocalPlanningBenchmarkSupervisor(Node):
         # file paths for benchmark data
         self.estimated_poses_file_path = path.join(self.benchmark_data_folder, "estimated_poses.csv")
         self.estimated_correction_poses_file_path = path.join(self.benchmark_data_folder, "estimated_correction_poses.csv")
+        self.odom_file_path = path.join(self.benchmark_data_folder, "odom.csv")
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
+        self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
         self.run_events_file_path = path.join(self.benchmark_data_folder, "run_events.csv")
-
-        self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
-
+        self.run_data_file_path = path.join(self.benchmark_data_folder, "run_data.yaml")
         self.init_run_events_file()
 
         # pandas dataframes for benchmark data
         self.estimated_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta'])
         self.estimated_correction_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'cov_x_x', 'cov_x_y', 'cov_y_y', 'cov_theta_theta'])
+        self.odom_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
-
-        self.cmd_vel_df = pd.DataFrame(columns=['x', 'y', 'z', 'a_x', 'a_y', 'a_z'])
+        self.cmd_vel_df = pd.DataFrame(columns=['t', 'linear_x', 'linear_y', 'linear_z', 'angular_x', 'angular_y', 'angular_z'])
+        self.run_data = dict()
 
         # setup timers
         self.create_timer(run_timeout, self.run_timeout_callback)
         self.create_timer(ps_snapshot_period, self.ps_snapshot_timer_callback)
         self.create_timer(write_estimated_poses_period, self.write_estimated_pose_timer_callback)
-        # self.create_timer(1.0, self.test_timer_callback)
 
         # setup service clients
         self.lifecycle_manager_service_client = self.create_client(ManageLifecycleNodes, lifecycle_manager_service)
@@ -174,60 +168,47 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         # setup publishers
-        self.initial_pose_publisher = self.create_publisher(PoseStamped, initial_pose_topic, 1)
-        traversal_path_publisher_qos_profile = copy.copy(qos_profile_sensor_data)
-        traversal_path_publisher_qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
-        self.traversal_path_publisher = self.create_publisher(Path, "~/traversal_path", traversal_path_publisher_qos_profile)
+        self.goal_pose_publisher = self.create_publisher(PoseStamped, goal_pose_topic, 1)
 
         # setup subscribers
-        self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
-        
         self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
+        self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
+        self.create_subscription(Odometry, odom_topic, self.odom_callback, qos_profile_sensor_data)
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
-        #self.local_planning_node_transition_event_subscriber = self.create_subscription(TransitionEvent, local_planning_node_transition_event_topic, self.local_planning_node_transition_event_callback, qos_profile_sensor_data)
+        self.create_subscription(TransitionEvent, navigation_transition_event_topic, self.lifecycle_transition_event_callback, qos_profile_parameter_events)
 
         # setup action clients
-        #self.navigate_to_pose_action_client = ActionClient(self, FollowPath, navigate_to_pose_action)
         self.navigate_to_pose_action_client = ActionClient(self, NavigateToPose, navigate_to_pose_action)
         self.navigate_to_pose_action_goal_future = None
         self.navigate_to_pose_action_result_future = None
 
     def start_run(self):
-        #return
+        print_info("waiting simulator and navigation stack", logger=self.get_logger().info)
 
-        print_info("preparing to start run")
-
-        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup)
+        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup) and for the navigation stack to activate
         waiting_time = 0.0
+        total_waiting_time = 0.0
         waiting_period = 0.5
-        while not self.received_first_scan and rclpy.ok():
+        while not self.received_first_scan or not self.navigation_node_activated:
+            if not rclpy.ok():
+                self.get_logger().fatal("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
+                raise RunFailException("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
+
             time.sleep(waiting_period)
             rclpy.spin_once(self)
             waiting_time += waiting_period
+            total_waiting_time += waiting_period
             if waiting_time > 5.0:
-                self.get_logger().warning('still waiting to receive first sensor message from environment')
+                self.get_logger().warning("still waiting to receive first sensor message from environment and navigation to be activated")
                 waiting_time = 0.0
-
-        # get the parameter robot_radius from the global costmap
-        parameters_request = GetParameters.Request(names=['robot_radius'])
-        parameters_response = self.call_service(self.global_costmap_get_parameters_service_client, parameters_request)
-        self.robot_radius = parameters_response.values[0].double_value
-        print_info("got robot radius")
+            if total_waiting_time > 60.0:
+                self.get_logger().fatal("timed out waiting to receive first sensor message from environment and navigation to be activated")
+                raise RunFailException("timed out waiting to receive first sensor message from environment and navigation to be activated")
+        print_info("finished waiting to receive first sensor message from environment and navigation to be activated", logger=self.get_logger().info)
 
         # get deleaved reduced Voronoi graph from ground truth map
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=2*self.robot_radius).copy()
-
-        #Maria: not needed in our case, just a list of the vertices of the Voronoi graph
-        # minimum_length_paths = nx.all_pairs_dijkstra_path(voronoi_graph, weight='voronoi_path_distance')
-        # minimum_length_costs = dict(nx.all_pairs_dijkstra_path_length(voronoi_graph, weight='voronoi_path_distance'))
-        # costs = defaultdict(dict)
-        # for i, paths_dict in minimum_length_paths:
-        #     for j in paths_dict.keys():
-        #         if i != j:
-        #             costs[i][j] = minimum_length_costs[i][j]
-
-        #vertices_list = list(voronoi_graph.nodes)
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
@@ -236,216 +217,122 @@ class LocalPlanningBenchmarkSupervisor(Node):
             voronoi_graph.remove_nodes_from(graph_component)
 
         if len(voronoi_graph.nodes) < 2:
-            self.write_event(self.get_clock().now(), 'insufficient_number_of_nodes_in_deleaved_reduced_voronoi_graph')
+            self.write_event('insufficient_number_of_nodes_in_deleaved_reduced_voronoi_graph')
             raise RunFailException("insufficient number of nodes in deleaved_reduced_voronoi_graph, can not generate traversal path")
 
-        # get greedy path traversing the whole graph starting from a random node
-        # traversal_path_indices = list()
-        # current_node = random.choice(list(voronoi_graph.nodes))
-        # nodes_queue = set(nx.node_connected_component(voronoi_graph, current_node))
-        # while len(nodes_queue):
-        #     candidates = list(filter(lambda node_cost: node_cost[0] in nodes_queue, costs[current_node].items()))
-        #     candidate_nodes, candidate_costs = zip(*candidates)
-        #     next_node = candidate_nodes[int(np.argmin(candidate_costs))]
-        #     traversal_path_indices.append(next_node)
-        #     current_node = next_node
-        #     nodes_queue.remove(next_node)
+        # select the node pseudo-randomly using the run number
+        # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
+        nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
+        random.Random(0).shuffle(nil)
+        self.pseudo_random_voronoi_index = nil[self.run_index % len(nil)]
 
-        #choose this as random
-        random_node_index = random.choice(list(voronoi_graph.nodes))
-
-        #MARIA: initial pose
-        pose = Pose()
-        pose.position.x, pose.position.y = voronoi_graph.nodes[random_node_index]['vertex']
+        # convert Voronoi node to pose
+        self.goal_pose = PoseStamped()
+        self.goal_pose.header.stamp = self.get_clock().now().to_msg()
+        self.goal_pose.header.frame_id = self.fixed_frame
+        self.goal_pose.pose = Pose()
+        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-        pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
+        self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
+        self.goal_pose_publisher.publish(self.goal_pose)
 
-        #MARIA: navigate to pose has no path 
-        # path_msg = Path()
-        # path_msg.header.frame_id = self.fixed_frame
-        # path_msg.header.stamp = self.get_clock().now().to_msg()
-        # self.traversal_path_publisher.publish(path_msg)
-        
-        #MARIA: goal pose
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = "map"
-        goal_pose.header.stamp =  self.get_clock().now().to_msg()
-        goal_pose.pose = pose
-        self.goal_pose = goal_pose
-        #self.initial_pose_publisher.publish(goal_pose)
-
-
-        #print(pose)
-        #print(goal_pose)
-
-        #MARIA: COMMENTED FROM HERE TO LINE 279
-        # pose_stamped = PoseStamped()
-        # pose_stamped.header.frame_id = "map"
-        # pose_stamped.header.stamp =  self.get_clock().now().to_msg()
-        # pose_stamped.pose = pose
-        # self.initial_pose_publisher.publish(pose_stamped)
-        
-
-        # set the position of the robot in the simulator
-#       self.call_service(self.pause_physics_service_client, Empty.Request())
-#        print_info("called pause_physics_service")
-#        time.sleep(1.0)
-#
-#        robot_entity_state = EntityState(
-#            name=self.robot_entity_name,
-#            pose=self.initial_pose.pose.pose
-#        )
-#        set_entity_state_response = self.call_service(self.set_entity_state_service_client, SetEntityState.Request(state=robot_entity_state))
-#        if not set_entity_state_response.success:
-#            self.write_event(self.get_clock().now(), 'failed_to_set_entity_state')
-#            raise RunFailException("could not set robot entity state")
-#        print_info("called set_entity_state_service")
-#        time.sleep(1.0)
-#
-#        self.call_service(self.unpause_physics_service_client, Empty.Request())
-#        print_info("called unpause_physics_service")
-#        time.sleep(1.0)
-
-        # ask lifecycle_manager to startup all its managed nodes
-        # startup_request = ManageLifecycleNodes.Request(command=ManageLifecycleNodes.Request.STARTUP)
-        # startup_response: ManageLifecycleNodes.Response = self.call_service(self.lifecycle_manager_service_client, startup_request)
-        # if not startup_response.success:
-        #     self.write_event(self.get_clock().now(), 'failed_to_startup_nodes')
-        #     raise RunFailException("lifecycle manager could not startup nodes")
-
-        time.sleep(5.0)
-
-        self.write_event(self.get_clock().now(), 'run_start')
+        self.write_event('run_start')
         self.run_started = True
-
         self.send_goal()
 
     def send_goal(self):
-        print_info(f"goal {self.goal_sent_count + 1} / {self.num_goals}")
-
-        print_info("waiting")
-        time.sleep(5.0)
-        print_info("finished waiting")
 
         if not self.navigate_to_pose_action_client.wait_for_server(timeout_sec=5.0):
-            self.write_event(self.get_clock().now(), 'failed_to_communicate_with_navigation_node')
+            self.write_event('failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
 
-
-        #goal_msg = FollowPath.Goal()
-        #goal_msg.path.header.stamp = self.get_clock().now().to_msg()
-        #goal_msg.path.header.frame_id = self.fixed_frame
-
-        #pose_stamped_message = PoseStamped()
-        #pose_stamped_message.pose = self.goal_pose
-        #pose_stamped_message.header.stamp = self.get_clock().now().to_msg()
-        # pose_stamped_message.header.frame_id = self.fixed_frame
-        # goal_msg.path.poses = [pose_stamped_message]
-        # self.current_goal = goal_msg
-
-        #MARIA
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = self.goal_pose
         goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.pose.header.frame_id = self.fixed_frame
-        self.current_goal = goal_msg
-
 
         self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
         self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
-        #Maria: simple feedback callback (?)
-        self.write_event(self.get_clock().now(), 'target_pose_set')
-        print_info("goal_msg", goal_msg)
-        self.goal_sent_count += 1
+        self.write_event('navigation_goal_sent')
+        self.run_data["goal_pose"] = self.goal_pose.pose
+        self.run_data["voronoi_node_index"] = self.pseudo_random_voronoi_index
 
     def ros_shutdown_callback(self):
         """
         This function is called when the node receives an interrupt signal (KeyboardInterrupt).
         """
-        print_info("asked to shutdown, terminating run")
-        self.write_event(self.get_clock().now(), 'ros_shutdown')
-        self.write_event(self.get_clock().now(), 'supervisor_finished')
+        print_info("asked to shutdown, terminating run", logger=self.get_logger().info)
+        self.write_event('ros_shutdown')
+        self.write_event('supervisor_finished')
 
     def end_run(self):
         """
         This function is called after the run has completed, whether the run finished correctly, or there was an exception.
-        The only case in which this function is not called is if an exception was raised from LocalPlanningBenchmarkSupervisor.__init__
+        The only case in which this function is not called is if an exception was raised from self.__init__
         """
         self.estimated_poses_df.to_csv(self.estimated_poses_file_path, index=False)
         self.estimated_correction_poses_df.to_csv(self.estimated_correction_poses_file_path, index=False)
+        self.odom_df.to_csv(self.odom_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
-
         self.cmd_vel_df.to_csv(self.cmd_vel_file_path, index=False)
+
+        with open(self.run_data_file_path, 'w') as run_data_file:
+            yaml.dump(self.run_data, run_data_file)
 
     def goal_response_callback(self, future):
         goal_handle = future.result()
-        print_info("goal_handle", goal_handle)
 
         # if the goal is rejected try with the next goal
         if not goal_handle.accepted:
-            print_error('navigation action goal rejected')
-            self.write_event(self.get_clock().now(), 'target_pose_rejected')
-            self.goal_rejected_count += 1
-            self.current_goal = None
-            self.send_goal()
+            self.get_logger().error('navigation action goal rejected')
+            self.write_event('navigation_goal_rejected')
+            if not self.prevent_shutdown:
+                rclpy.shutdown()
             return
 
-        self.write_event(self.get_clock().now(), 'target_pose_accepted')
+        self.write_event('navigation_goal_accepted')
 
         self.navigate_to_pose_action_result_future = goal_handle.get_result_async()
         self.navigate_to_pose_action_result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         status = future.result().status
-        print_info("status", status)
+        self.run_data["navigation_final_status"] = status
 
         if status == GoalStatus.STATUS_SUCCEEDED:
-            goal_position = self.current_goal.pose.pose.position
-            current_position = self.latest_ground_truth_pose_msg.pose.pose.position
-            distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
-            if distance_from_goal < self.goal_tolerance:
-                self.write_event(self.get_clock().now(), 'target_pose_reached')
-                self.goal_succeeded_count += 1
+            self.write_event('navigation_succeeded')
+            goal_position = self.goal_pose.pose.position
+            if self.latest_estimated_position is not None:
+                current_position = self.latest_estimated_position
+                distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
+                if distance_from_goal < self.goal_tolerance:
+                    self.write_event('navigation_goal_reached')
+                else:
+                    self.get_logger().error("goal status succeeded but current position farther from goal position than tolerance")
+                    self.write_event('navigation_goal_not_reached')
             else:
-                print_error("goal status succeeded but current position farther from goal position than tolerance")
-                self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-                self.goal_failed_count += 1
-    
-    #Maria: we reach this line when the navigation stack was not able to navigate to the goal pose if p.e objects in the way or if the robot got stuck (close to a wall,...) or if there any exceptions or crash in the other nodes of the nav stack
+                self.get_logger().fatal("estimated position not set")
+                self.write_event('estimated_position_not_received')
+                if not self.prevent_shutdown:
+                    rclpy.shutdown()
         else:
-            print_info('navigation action failed with status {}'.format(status))
-            self.write_event(self.get_clock().now(), 'target_pose_not_reached')
-            self.goal_failed_count += 1
+            print_info('navigation action failed with status {}'.format(status), logger=self.get_logger().info)
+            self.write_event('navigation_failed')
 
-        self.current_goal = None
+        self.write_event('run_completed')
+        if not self.prevent_shutdown:
+            rclpy.shutdown()
 
-        #the goal has been sent and the navigation stack reached the goal, end the run
-        self.write_event(self.get_clock().now(), 'run_completed')
-
-        #return
-
-        rclpy.shutdown()
-      
-
-    def local_planning_node_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
+    def lifecycle_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
         # send the initial pose as soon as the localization node activates the first time
-        if transition_event_msg.goal_state.label == 'active' and not self.local_planning_node_activated:
-            if self.initial_pose is None:
-                print_error("initial_pose is still None")
-                return
-
-            self.local_planning_node_activated = True
-            self.initial_pose_publisher.publish(self.initial_pose)
-            self.write_event(self.get_clock().now(), "initial_pose_set")
-
-    # def test_timer_callback(self):
-    #     print_info("test_timer_callback")
+        if transition_event_msg.goal_state.label == 'active' and not self.navigation_node_activated:
+            self.navigation_node_activated = True
+            self.write_event("navigation_node_activated")
 
     def run_timeout_callback(self):
-        print_error("terminating supervisor due to timeout, terminating run")
-        self.write_event(self.get_clock().now(), 'run_timeout')
-        self.write_event(self.get_clock().now(), 'supervisor_finished')
-        raise RunFailException("timeout")
+        self.get_logger().error("terminating supervisor due to timeout, terminating run")
+        self.write_event('run_timeout')
+        if not self.prevent_shutdown:
+            self.destroy_node()
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
@@ -463,9 +350,24 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 range_max=laser_scan_msg.range_max,
                 ranges=', '.join(map(str, laser_scan_msg.ranges))))
 
+    def cmd_vel_callback(self, twist_msg: Twist):
+        if not self.run_started:
+            return
+
+        self.cmd_vel_df = self.cmd_vel_df.append({
+            't': nanoseconds_to_seconds(self.get_clock().now().nanoseconds),
+            'linear_x': twist_msg.linear.x,
+            'linear_y': twist_msg.linear.y,
+            'linear_z': twist_msg.linear.z,
+            'angular_x': twist_msg.angular.x,
+            'angular_y': twist_msg.angular.y,
+            'angular_z': twist_msg.angular.z,
+        }, ignore_index=True)
+
     def write_estimated_pose_timer_callback(self):
         try:
             transform_msg = self.tf_buffer.lookup_transform(self.fixed_frame, self.robot_base_frame, Time())
+            self.latest_estimated_position = transform_msg.transform.translation  # save the latest position to check if the robot has reached the goal within tolerance
             orientation = transform_msg.transform.rotation
             theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
@@ -498,25 +400,24 @@ class LocalPlanningBenchmarkSupervisor(Node):
             'cov_theta_theta': covariance_mat[5, 5]
         }, ignore_index=True)
 
-
-
-    def cmd_vel_callback(self, twist_msg: geometry_msgs.msg.Twist):
+    def odom_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         if not self.run_started:
             return
-        
-        self.cmd_vel_df = self.cmd_vel_df.append({
-            'x': twist_msg.linear.x,
-            'y': twist_msg.linear.y,
-            'z': twist_msg.linear.x,
-            'a_x': twist_msg.angular.x,
-            'a_y': twist_msg.angular.y,
-            'a_z': twist_msg.angular.z,
+
+        orientation = odometry_msg.pose.pose.orientation
+        theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
+
+        self.odom_df = self.odom_df.append({
+            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
+            'x': odometry_msg.pose.pose.position.x,
+            'y': odometry_msg.pose.pose.position.y,
+            'theta': theta,
+            'v_x': odometry_msg.twist.twist.linear.x,
+            'v_y': odometry_msg.twist.twist.linear.y,
+            'v_theta': odometry_msg.twist.twist.angular.z,
         }, ignore_index=True)
 
-
-
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
-        self.latest_ground_truth_pose_msg = odometry_msg
         if not self.run_started:
             return
 
@@ -543,10 +444,12 @@ class LocalPlanningBenchmarkSupervisor(Node):
             except psutil.NoSuchProcess:  # processes may have died, causing this exception to be raised from psutil.Process.as_dict
                 continue
             try:
-                # delete uninteresting values
+                # delete uninteresting values and add time information
                 del process_copy['connections']
                 del process_copy['memory_maps']
                 del process_copy['environ']
+                process_copy['realtime_stamp'] = time.time()
+                process_copy['rostime_stamp'] = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
 
                 processes_dicts_list.append(process_copy)
             except KeyError:
@@ -555,26 +458,29 @@ class LocalPlanningBenchmarkSupervisor(Node):
             with open(ps_snapshot_file_path, 'wb') as ps_snapshot_file:
                 pickle.dump(processes_dicts_list, ps_snapshot_file)
         except TypeError:
-            print_error(traceback.format_exc())
+            self.get_logger().error(traceback.format_exc())
 
         self.ps_snapshot_count += 1
 
     def init_run_events_file(self):
-        backup_file_if_exists(self.run_events_file_path)
         try:
             with open(self.run_events_file_path, 'w') as run_events_file:
-                run_events_file.write("{t}, {event}\n".format(t='timestamp', event='event'))
+                run_events_file.write("t, real_time, event\n")
         except IOError as e:
             self.get_logger().error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
             self.get_logger().error(e)
 
-    def write_event(self, stamp, event):
-        print_info("t: {t}, event: {event}".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+    def write_event(self, event):
+        ros_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
+        real_time = time.time()
+        event_string = f"t: {ros_time}, real_time: {real_time}, event: {str(event)}"
+        event_csv_line = f"{ros_time}, {real_time}, {str(event)}\n"
+        print_info(event_string, logger=self.get_logger().info)
         try:
             with open(self.run_events_file_path, 'a') as run_events_file:
-                run_events_file.write("{t}, {event}\n".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+                run_events_file.write(event_csv_line)
         except IOError as e:
-            self.get_logger().error("slam_benchmark_supervisor.write_event: could not write event to run_events_file: {t} {event}".format(t=nanoseconds_to_seconds(stamp.nanoseconds), event=str(event)))
+            self.get_logger().error(f"write_event: could not write event to run_events_file: {event_string}")
             self.get_logger().error(e)
 
     def call_service(self, service_client, request, fail_timeout=30.0, warning_timeout=5.0):
@@ -583,6 +489,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             self.get_logger().warning(f'supervisor: still waiting {service_client.srv_name} to become available')
             time_waited += warning_timeout
             if time_waited >= fail_timeout:
+                self.get_logger().error(f'{service_client.srv_name} was not available')
                 raise RunFailException(f"{service_client.srv_name} was not available")
 
         srv_future = service_client.call_async(request)
