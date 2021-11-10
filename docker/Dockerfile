@@ -28,6 +28,7 @@ RUN \
     python3-skimage \
     python3-sklearn \
     python3-colcon-common-extensions \
+    ros-foxy-tf-transformations \
     ros-foxy-rviz2 \
     ros-foxy-gazebo-*
 
@@ -37,6 +38,7 @@ RUN \
   cd ~/w/ros2_ws/src && \
   git clone --branch=master https://github.com/AIRLab-POLIMI/performance_modelling.git && \
   git clone --branch=foxy-devel https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
+  git clone --branch=foxy https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git && \
   git clone --branch=ros2 https://github.com/rst-tu-dortmund/costmap_converter.git && \
   git clone --branch=foxy-devel https://github.com/rst-tu-dortmund/teb_local_planner.git
 
