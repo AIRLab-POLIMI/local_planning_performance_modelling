@@ -99,4 +99,3 @@ def main():
                            ignore_executed_params_combinations=args.ignore_previous_runs,
                            shuffle=not args.no_shuffle,
                            args_parser=args)
-
