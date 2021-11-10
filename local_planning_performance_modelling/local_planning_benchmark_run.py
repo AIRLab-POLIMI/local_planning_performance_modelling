@@ -56,6 +56,8 @@ class BenchmarkRun(object):
 
         amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = [None]*4
         localization_generator_update_rate = None
+        localization_generator_translation_error = None
+        localization_generator_rotation_error = None
         if self.localization_node == 'amcl':
             amcl_alpha_factor = self.run_parameters['amcl_alpha_factor']
             if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
@@ -64,6 +66,8 @@ class BenchmarkRun(object):
                 amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = amcl_alpha_factor * alpha_1, amcl_alpha_factor * alpha_2, amcl_alpha_factor * alpha_3, amcl_alpha_factor * alpha_4
         elif self.localization_node == 'localization_generator':
             localization_generator_update_rate = self.run_parameters['localization_generator_update_rate']
+            localization_generator_translation_error = self.run_parameters['localization_generator_translation_error']
+            localization_generator_rotation_error = self.run_parameters['localization_generator_rotation_error']
         else:
             raise ValueError()
 
@@ -163,7 +167,9 @@ class BenchmarkRun(object):
             localization_configuration['amcl']['ros__parameters']['alpha3'] = amcl_alpha_3
             localization_configuration['amcl']['ros__parameters']['alpha4'] = amcl_alpha_4
         elif self.localization_node == 'localization_generator':
-            localization_configuration['localization_generator']['ros__parameters']['publish_pose_rate'] = localization_generator_update_rate
+            localization_configuration['localization_generator']['ros__parameters']['update_pose_rate'] = localization_generator_update_rate
+            localization_configuration['localization_generator']['ros__parameters']['translation_error'] = localization_generator_translation_error
+            localization_configuration['localization_generator']['ros__parameters']['rotation_error'] = localization_generator_rotation_error
         else:
             raise ValueError()
         if not path.exists(path.dirname(self.localization_configuration_path)):

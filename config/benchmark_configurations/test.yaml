@@ -33,12 +33,25 @@ run_index: &id001 [0]
 #run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 combinatorial_parameters: [
-
+#  {
+#    robot_model: [hunter2],
+#    odometry_error: [[0.0, 0.0, 0.0, 0.0]],
+#    localization_node: [localization_generator],
+#    localization_generator_update_rate: [1.0],
+#    localization_generator_translation_error: [0.1],
+#    localization_generator_rotation_error: [0.026],
+#    local_planner_node: [teb],
+#    global_planner_node: [navfn],
+#    max_steering_angle_deg: [40],
+#    run_index: *id001,
+#  },
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
     odometry_error: [[0.0, 0.0, 0.0, 0.0]],
     localization_node: [localization_generator],
     localization_generator_update_rate: [1.0],
+    localization_generator_translation_error: [0.1],
+    localization_generator_rotation_error: [0.026],
     local_planner_node: [dwb],
     global_planner_node: [navfn],
     run_index: *id001,

@@ -3,11 +3,16 @@ localization_generator:
 
     use_sim_time: True
 
-    # run parameters
-    publish_tf_rate: 50.0
+    # localization parameters
     update_pose_rate: 1.0
     translation_error: 0.1
     rotation_error: 0.1
+
+    # other parameters
+    publish_tf_rate: 50.0
+    ground_truth_timeout: 0.5
+    ground_truth_start_timeout: 5.0
+    transform_tolerance: 1.0
 
     # topic names
     generated_pose_topic: /generated_pose
