@@ -88,7 +88,7 @@ def main():
     else:
         grid_benchmark_configuration = path.expanduser(args.benchmark_configuration)
     if not path.exists(grid_benchmark_configuration):
-        print_error(f"benchmark configuration file [{path.abspath(grid_benchmark_configuration)}] does not exists")
+        print_error(f"benchmark configuration file [{path.abspath(grid_benchmark_configuration)}] does not exist")
         sys.exit(-1)
 
     execute_grid_benchmark(benchmark_run_object=BenchmarkRun,
