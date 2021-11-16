@@ -153,6 +153,13 @@ class BenchmarkRun(object):
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['use_sim_time'] = self.use_sim_time
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['ground_truth_map_info_path'] = self.map_info_file_path
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['goal_obstacle_min_distance'] = goal_obstacle_min_distance
+        if self.localization_node == 'amcl':
+            supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['estimated_pose_correction_topic'] = "/amcl_pose"
+        elif self.localization_node == 'localization_generator':
+            supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['estimated_pose_correction_topic'] = "/generated_pose"
+        else:
+            raise ValueError()
+
         if not path.exists(path.dirname(self.supervisor_configuration_path)):
             os.makedirs(path.dirname(self.supervisor_configuration_path))
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
