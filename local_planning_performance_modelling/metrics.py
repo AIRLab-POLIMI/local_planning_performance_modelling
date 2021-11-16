@@ -333,7 +333,7 @@ class OdometryError:
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
         self.metric_name = "odometry_error"
-        self.version = 1
+        self.version = 2
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -436,8 +436,11 @@ class OdometryError:
 
             # get start pose and end pose that most closely matches start and end times
             interpolated_df_clipped = interpolated_df[(start_timestamp <= interpolated_df.t) & (interpolated_df.t <= end_timestamp)]
-            if len(interpolated_df_clipped) == 0:
+            if len(interpolated_df_clipped) < 1:
                 print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
+                continue
+            if len(interpolated_df[(interpolated_df.t < start_timestamp)]) < 1:
+                print_info(f"{self.metric_name}: not enough interpolated poses before update interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
                 continue
             interpolated_start_poses = interpolated_df[(interpolated_df.t < start_timestamp)].iloc[-1]
             interpolated_end_poses = interpolated_df_clipped.iloc[-1]
@@ -471,6 +474,9 @@ class OdometryError:
             if trajectory_translation > 0.01:  # only compute this errors if there was a meaningful translation (1cm)
                 odom_errors_alpha_2.append(relative_rotation_error/trajectory_translation)
                 odom_errors_alpha_3.append(relative_translation_error/trajectory_translation)
+
+        if len(odom_errors_alpha_1) == 0 or len(odom_errors_alpha_2) == 0 or len(odom_errors_alpha_3) == 0 or len(odom_errors_alpha_4) == 0:
+            print_error(f"{self.metric_name}: len(odom_errors_alpha_i) == 0:\n{self.ground_truth_poses_file_path}")
 
         self.results_df["odometry_error_alpha_1_mean"] = [float(np.mean(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
         self.results_df["odometry_error_alpha_1_std"] = [float(np.std(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
