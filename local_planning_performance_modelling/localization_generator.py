@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import random
+from copy import copy
+
 import numpy as np
 import pyquaternion
 import rclpy
@@ -26,6 +28,18 @@ def main(args=None):
         pass
 
 
+def hc(p):
+    return np.array([
+        [np.cos(p.theta), -np.sin(p.theta), p.x],
+        [np.sin(p.theta), np.cos(p.theta), p.y],
+        [0, 0, 1],
+    ])
+
+
+def pose_2d(m_hc):
+    return Pose2D(x=m_hc[0, 2], y=m_hc[1, 2], theta=np.arctan2(m_hc[1, 0], m_hc[0, 0]))
+
+
 class LocalizationGenerator(Node):
     def __init__(self):
         super().__init__('localization_generator_node', automatically_declare_parameters_from_overrides=True)
@@ -35,6 +49,8 @@ class LocalizationGenerator(Node):
         update_pose_rate = self.get_parameter('update_pose_rate').value
         self.translation_error = self.get_parameter('translation_error').value
         self.rotation_error = self.get_parameter('rotation_error').value
+        self.normalized_relative_translation_error = self.get_parameter('normalized_relative_translation_error').value
+        self.normalized_relative_rotation_error = self.get_parameter('normalized_relative_rotation_error').value
         generated_pose_topic = self.get_parameter('generated_pose_topic').value
         ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
         self.fixed_frame = self.get_parameter('fixed_frame').value
@@ -66,10 +82,13 @@ class LocalizationGenerator(Node):
         # setup subscribers
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
 
-        self.get_logger().info(f"localization parameters:"
-                               f"    translation_error: {self.translation_error}"
-                               f"    rotation_error: {self.rotation_error}"
-                               f"    update_pose_rate: {update_pose_rate}")
+        self.get_logger().info(f"localization parameters:\n"
+                               f"    update_pose_rate: {update_pose_rate}\n"
+                               f"    absolute_translation_error: {self.translation_error}\n"
+                               f"    absolute_rotation_error: {self.rotation_error}\n"
+                               f"    normalized_relative_translation_error: {self.normalized_relative_translation_error}\n"
+                               f"    normalized_relative_rotation_error: {self.normalized_relative_rotation_error}"
+                               )
 
     def update_pose_timer_callback(self):
         now = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
@@ -81,19 +100,17 @@ class LocalizationGenerator(Node):
         if now - self.last_gt_time > self.gt_timeout:
             print_error(f"LocalizationGenerator: last ground truth message older than {self.gt_timeout} seconds [{now - self.last_gt_time}]")
 
+        prev_pose_2d_gen = copy(self.pose_2d_gen)
+
         self.pose_2d_gen.x = random.normalvariate(self.pose_2d_gt.x, self.translation_error)
         self.pose_2d_gen.y = random.normalvariate(self.pose_2d_gt.y, self.translation_error)
         self.pose_2d_gen.theta = random.normalvariate(self.pose_2d_gt.theta, self.rotation_error)
 
-        def hc(p):
-            return np.array([
-                [np.cos(p.theta), -np.sin(p.theta), p.x],
-                [np.sin(p.theta), np.cos(p.theta), p.y],
-                [0, 0, 1],
-            ])
+        # s_t = np.sqrt((s_a ** 2 * s_r ** 2) / (s_a ** 2 + s_r ** 2))
+        # x_t = (x_r * s_a ** 2 + x_a * s_r ** 2) / (s_a ** 2 + s_r ** 2)
+        # y_t = (y_r * s_a ** 2 + y_a * s_r ** 2) / (s_a ** 2 + s_r ** 2)
 
-        def pose_2d(m_hc):
-            return Pose2D(x=m_hc[0, 2], y=m_hc[1, 2], theta=np.arctan2(m_hc[1, 0], m_hc[0, 0]))
+        print(prev_pose_2d_gen, self.pose_2d_gen)
 
         odom_to_base_tf = self.tf_buffer.lookup_transform(source_frame=self.robot_base_frame, target_frame=self.odom_frame, time=Time())
         r = odom_to_base_tf.transform.rotation

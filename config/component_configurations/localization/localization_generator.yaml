@@ -3,10 +3,10 @@ localization_generator:
 
     use_sim_time: True
 
-    # localization parameters
-    update_pose_rate: 1.0
-    translation_error: 0.1
-    rotation_error: 0.1
+#    # localization parameters
+#    update_pose_rate: 1.0
+#    translation_error: 0.1
+#    rotation_error: 0.1
 
     # other parameters
     publish_tf_rate: 50.0
