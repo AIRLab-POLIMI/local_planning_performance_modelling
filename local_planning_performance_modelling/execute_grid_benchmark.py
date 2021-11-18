@@ -19,7 +19,7 @@ def main():
 
     grid_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
     default_grid_configuration_from_package = "grid_benchmark_all.yaml"
-    parser.add_argument('-p', dest='grid_configuration_from_package',
+    parser.add_argument('-d', dest='grid_configuration_from_package',
                         help=f'Yaml file with the combinatorial parameters relative to the config/benchmark_configurations folder in this package. If set, the option "grid_configuration" will be ignored.'
                              f' Defaults to {default_grid_configuration_from_package}. Available configuration files:\n' +
                              '\n'.join(sorted(os.listdir(grid_configurations_dir_path))),
@@ -28,7 +28,7 @@ def main():
                         required=False)
 
     default_grid_configuration = path.join(grid_configurations_dir_path, default_grid_configuration_from_package)
-    parser.add_argument('-c', dest='grid_configuration',
+    parser.add_argument('-g', dest='grid_configuration',
                         help=f'Yaml file with the configuration of the benchmark. This option is ignored if the option grid_configuration_from_package is set. Defaults to {default_grid_configuration}.',
                         type=str,
                         default=default_grid_configuration,
