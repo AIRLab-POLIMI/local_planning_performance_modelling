@@ -141,7 +141,7 @@ def main():
     def is_not_completed_run_folder(p):
         return path.isdir(p) and not path.exists(path.join(p, "RUN_COMPLETED"))
 
-    run_folders = list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder))))
+    run_folders = sorted(list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
     not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
 
     if len(run_folders) == 0:
