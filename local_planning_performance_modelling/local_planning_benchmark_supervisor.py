@@ -74,7 +74,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # Debug variable
-        self.prevent_shutdown = False  # if true, runs will never end
+        self.prevent_shutdown = True  # TODO  # if true, runs will never end
 
         # topics, services, actions, entities and frames names
         scan_topic = self.get_parameter('scan_topic').value

@@ -14,9 +14,9 @@ from rclpy.time import Time
 from rclpy.qos import qos_profile_sensor_data
 import nav_msgs
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Pose, Quaternion, PoseWithCovarianceStamped, TransformStamped, Pose2D
+from geometry_msgs.msg import Pose, Quaternion, PoseWithCovarianceStamped, TransformStamped, Pose2D, PoseStamped, PoseArray
 
-from performance_modelling_py.utils import nanoseconds_to_seconds, print_error
+from performance_modelling_py.utils import nanoseconds_to_seconds, print_error, print_info
 
 
 def main(args=None):
@@ -64,6 +64,9 @@ class LocalizationGenerator(Node):
         self.pose_2d_gt = Pose2D()
         self.pose_2d_gen = Pose2D()
         self.map_to_odom_pose_2d = Pose2D()
+        self.prev_pose_2d_gt = Pose2D()
+        self.prev_pose_2d_rel = Pose2D()
+        self.gt_poses = list()
         self.start_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
         self.last_gt_time = None
 
@@ -78,6 +81,8 @@ class LocalizationGenerator(Node):
 
         # setup publishers
         self.generated_pose_publisher = self.create_publisher(PoseWithCovarianceStamped, generated_pose_topic, qos_profile_sensor_data)
+        self.relative_pose_publisher = self.create_publisher(PoseStamped, "/relative_pose", qos_profile_sensor_data)
+        self.gt_poses_publisher = self.create_publisher(PoseArray, "/gt_poses", qos_profile_sensor_data)
 
         # setup subscribers
         self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
@@ -101,16 +106,24 @@ class LocalizationGenerator(Node):
             print_error(f"LocalizationGenerator: last ground truth message older than {self.gt_timeout} seconds [{now - self.last_gt_time}]")
 
         prev_pose_2d_gen = copy(self.pose_2d_gen)
+        curr_pose_2d_gt = copy(self.pose_2d_gt)
 
-        self.pose_2d_gen.x = random.normalvariate(self.pose_2d_gt.x, self.translation_error)
-        self.pose_2d_gen.y = random.normalvariate(self.pose_2d_gt.y, self.translation_error)
-        self.pose_2d_gen.theta = random.normalvariate(self.pose_2d_gt.theta, self.rotation_error)
+        curr_pose_2d_rel = pose_2d(hc(self.prev_pose_2d_rel) @ (np.linalg.inv(hc(self.prev_pose_2d_gt)) @ hc(curr_pose_2d_gt)))
+        self.publish_pose_2d(curr_pose_2d_rel)
 
+        self.pose_2d_gen.x = random.normalvariate(curr_pose_2d_gt.x, self.translation_error)
+        self.pose_2d_gen.y = random.normalvariate(curr_pose_2d_gt.y, self.translation_error)
+        self.pose_2d_gen.theta = random.normalvariate(curr_pose_2d_gt.theta, self.rotation_error)
+
+        # mix of two normal dists
         # s_t = np.sqrt((s_a ** 2 * s_r ** 2) / (s_a ** 2 + s_r ** 2))
         # x_t = (x_r * s_a ** 2 + x_a * s_r ** 2) / (s_a ** 2 + s_r ** 2)
         # y_t = (y_r * s_a ** 2 + y_a * s_r ** 2) / (s_a ** 2 + s_r ** 2)
 
-        print(prev_pose_2d_gen, self.pose_2d_gen)
+        print_info("curr_pose_2d_rel   ", curr_pose_2d_rel, logger=self.get_logger().info)
+        print_info("prev_pose_2d_rel_hc", hc(self.prev_pose_2d_rel), logger=self.get_logger().info)
+        print_info("prev_pose_2d_gen   ", prev_pose_2d_gen, logger=self.get_logger().info)
+        print_info("self.pose_2d_gen   ", self.pose_2d_gen, logger=self.get_logger().info)
 
         odom_to_base_tf = self.tf_buffer.lookup_transform(source_frame=self.robot_base_frame, target_frame=self.odom_frame, time=Time())
         r = odom_to_base_tf.transform.rotation
@@ -121,6 +134,16 @@ class LocalizationGenerator(Node):
         )
         self.map_to_odom_pose_2d = pose_2d(hc(self.pose_2d_gen) @ np.linalg.inv(hc(odom_to_base_pose_2d)))
 
+        current_pose_gt = Pose()
+        current_pose_gt.position.x = curr_pose_2d_gt.x
+        current_pose_gt.position.y = curr_pose_2d_gt.y
+        curr_gt_q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=curr_pose_2d_gt.theta)
+        current_pose_gt.orientation = Quaternion(w=curr_gt_q.w, x=curr_gt_q.x, y=curr_gt_q.y, z=curr_gt_q.z)
+        self.gt_poses.append(current_pose_gt)
+        self.publish_gt_poses()
+
+        self.prev_pose_2d_gt = copy(curr_pose_2d_gt)
+        self.prev_pose_2d_rel = copy(curr_pose_2d_rel)
         self.publish_pose()
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
@@ -151,3 +174,21 @@ class LocalizationGenerator(Node):
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=self.pose_2d_gen.theta)
         p.pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
         self.generated_pose_publisher.publish(p)
+
+    def publish_gt_poses(self):
+        p = PoseArray()
+        p.header.stamp = self.get_clock().now().to_msg()
+        p.header.frame_id = self.fixed_frame
+        p.poses = self.gt_poses
+        self.gt_poses_publisher.publish(p)
+
+    def publish_pose_2d(self, pose_2d_msg):
+        p = PoseStamped()
+        p.header.stamp = self.get_clock().now().to_msg()
+        p.header.frame_id = self.fixed_frame
+        p.pose = Pose()
+        p.pose.position.x = pose_2d_msg.x
+        p.pose.position.y = pose_2d_msg.y
+        q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=pose_2d_msg.theta)
+        p.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
+        self.relative_pose_publisher.publish(p)
