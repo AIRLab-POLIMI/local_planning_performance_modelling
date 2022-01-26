@@ -53,6 +53,46 @@ def weighted_angle_average(a_angle, a_w, b_angle, b_w):
     return np.arctan2(a_w * np.sin(a_angle) + b_w * np.sin(b_angle), a_w * np.cos(a_angle) + b_w * np.cos(b_angle))
 
 
+def get_closest_intersections(x0, y0, r0, x1, y1, r1):  # modified from https://stackoverflow.com/questions/55816902/finding-the-intersection-of-two-circles/55817881
+    # circle 1: (x0, y0), radius r0
+    # circle 2: (x1, y1), radius r1
+
+    d = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+
+    # concentric
+    if d == 0:
+        return (x0, y0, r0 / 2 + r1 / 2), None
+
+    # non intersecting
+    if d > r0 + r1:
+        a = r0 / 2 + d / 2 - r1 / 2
+        x2 = x0 + (x1 - x0) / d * a
+        y2 = y0 + (y1 - y0) / d * a
+        return None, (x2, y2, x2, y2)
+
+    # One circle within other
+    if d < abs(r0 - r1):
+        if r1 > r0:
+            x0, y0, r0, x1, y1, r1 = x1, y1, r1, x0, y0, r0
+        a = d / 2 + r1 / 2 + r0 / 2
+        x2 = x0 + (x1 - x0) / d * a
+        y2 = y0 + (y1 - y0) / d * a
+        return None, (x2, y2, x2, y2)
+
+    else:
+        a = (r0 ** 2 - r1 ** 2 + d ** 2) / (2 * d)
+        h = np.sqrt(r0 ** 2 - a ** 2)
+        x2 = x0 + a * (x1 - x0) / d
+        y2 = y0 + a * (y1 - y0) / d
+        x3 = x2 + h * (y1 - y0) / d
+        y3 = y2 - h * (x1 - x0) / d
+
+        x4 = x2 - h * (y1 - y0) / d
+        y4 = y2 + h * (x1 - x0) / d
+
+        return None, (x3, y3, x4, y4)
+
+
 class LocalizationGenerator(Node):
     def __init__(self):
         super().__init__('localization_generator_node', automatically_declare_parameters_from_overrides=True)
@@ -131,7 +171,6 @@ class LocalizationGenerator(Node):
         prev_pose_2d_gen = copy(self.pose_2d_gen)
         curr_pose_2d_gt = copy(self.pose_2d_gt)
         rel_gt_ht = np.linalg.inv(ht(self.last_update_pose_2d_gt)) @ ht(curr_pose_2d_gt)
-        self.publish_gt_poses(curr_pose_2d_gt)
 
         print_info("self.trajectory_rotation_sum ", self.trajectory_rotation_sum, logger=self.get_logger().info)
         relative_translation_error = self.normalized_relative_translation_error * self.trajectory_translation_sum
@@ -146,7 +185,7 @@ class LocalizationGenerator(Node):
         )
         rel_ht_with_error = rel_gt_ht @ ht(rel_error_sample_pose_2d)
         curr_pose_2d_rel_with_error = pose_2d(ht(self.prev_pose_2d_rel) @ rel_ht_with_error)
-        self.publish_rel_poses(curr_pose_2d_rel_with_error)
+        # self.publish_rel_poses(curr_pose_2d_rel_with_error)
         self.prev_pose_2d_rel = copy(curr_pose_2d_rel_with_error)
 
         pose_2d_abs = Pose2D()
@@ -158,21 +197,41 @@ class LocalizationGenerator(Node):
         #   s_t = np.sqrt((s_a**2 * s_r**2) / (s_a**2 + s_r**2))
         #   x_t = (x_r * s_a**2 + x_a * s_r**2) / (s_a**2 + s_r**2)
         curr_pose_2d_rel = pose_2d(ht(prev_pose_2d_gen) @ rel_gt_ht)
-        s_tra = np.sqrt((self.absolute_translation_error ** 2 * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2))
-        x_tra = (curr_pose_2d_rel.x * self.absolute_translation_error ** 2 + curr_pose_2d_gt.x * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2)
-        y_tra = (curr_pose_2d_rel.y * self.absolute_translation_error ** 2 + curr_pose_2d_gt.y * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2)
+        # s_tra = np.sqrt((self.absolute_translation_error ** 2 * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2))
+        # x_tra = (curr_pose_2d_rel.x * self.absolute_translation_error ** 2 + curr_pose_2d_gt.x * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2)
+        # y_tra = (curr_pose_2d_rel.y * self.absolute_translation_error ** 2 + curr_pose_2d_gt.y * relative_translation_error ** 2) / (self.absolute_translation_error ** 2 + relative_translation_error ** 2)
         s_rot = np.sqrt((self.absolute_rotation_error ** 2 * relative_rotation_error ** 2) / (self.absolute_rotation_error ** 2 + relative_rotation_error ** 2))
         x_rot = weighted_angle_average(curr_pose_2d_rel.theta, self.absolute_rotation_error ** 2 / (self.absolute_rotation_error ** 2 + relative_rotation_error ** 2),
                                        curr_pose_2d_gt.theta, relative_rotation_error ** 2 / (self.absolute_rotation_error ** 2 + relative_rotation_error ** 2)
                                        )
 
-        self.publish_viz_circle(curr_pose_2d_rel, .5, "rel")
-        self.publish_viz_circle(curr_pose_2d_gt, .5, "abs")
+        self.publish_viz_circle(curr_pose_2d_rel, relative_translation_error, "rel")
+        self.publish_rel_poses(curr_pose_2d_rel)
+        self.publish_viz_circle(curr_pose_2d_gt, self.absolute_translation_error, "abs")
+        self.publish_gt_poses(curr_pose_2d_gt)
 
         self.pose_2d_gen = Pose2D()
-        self.pose_2d_gen.x = random.normalvariate(x_tra, s_tra)
-        self.pose_2d_gen.y = random.normalvariate(y_tra, s_tra)
         self.pose_2d_gen.theta = random.normalvariate(x_rot, s_rot)
+
+        intersection_circle, intersection_points = get_closest_intersections(
+            curr_pose_2d_rel.x, curr_pose_2d_rel.y, relative_translation_error,
+            curr_pose_2d_gt.x, curr_pose_2d_gt.y, self.absolute_translation_error
+        )
+        if intersection_points is not None:
+            print_info("intersection_points:", intersection_points, logger=self.get_logger().info)
+            i_x1, i_y1, i_x2, i_y2 = intersection_points
+            self.pose_2d_gen.x, self.pose_2d_gen.y = random.choice([(i_x1, i_y1), (i_x2, i_y2)])
+        elif intersection_circle is not None:
+            print_info("intersection_circle:", intersection_circle, logger=self.get_logger().info)
+            i_x, i_y, i_r = intersection_circle
+            rnd_angle = random.uniform(0, 2*np.pi)
+            self.pose_2d_gen.x, self.pose_2d_gen.y = i_x + i_r*np.cos(rnd_angle), i_y + i_r*np.sin(rnd_angle)
+        else:
+            print_error("no points nor circle from get_closest_intersections:", logger=self.get_logger().error)
+
+        # self.pose_2d_gen.x = random.normalvariate(x_tra, s_tra)
+        # self.pose_2d_gen.y = random.normalvariate(y_tra, s_tra)
+        print_info("self.pose_2d_gen:", self.pose_2d_gen, logger=self.get_logger().info)
         self.publish_gen_poses(self.pose_2d_gen)
 
         # print_info("curr_pose_2d_rel.theta\n\t", curr_pose_2d_rel.theta, logger=self.get_logger().info)
@@ -231,7 +290,7 @@ class LocalizationGenerator(Node):
         marker.action = visualization_msgs.msg.Marker.ADD
         marker.points = [Point(x=r*np.cos(t), y=r*np.sin(t)) for t in np.linspace(0, 2*np.pi, 50)]
         marker.pose = pose_msg
-        marker.scale.x = 0.01
+        marker.scale.x = 0.001
         marker.color.a = 1.0
         marker.color.r = 1.0
         self.viz_marker_publisher.publish(marker)
