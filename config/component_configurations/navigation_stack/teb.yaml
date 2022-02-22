@@ -25,7 +25,11 @@ controller_server:
     # TEB controller parameters
     FollowPath:
       plugin: "teb_local_planner::TebLocalPlannerROS"
-#      cmd_angle_instead_rotvel: True
+      max_vel_x: 0.26
+      max_vel_theta: 1.0
+      acc_lim_x: 2.5
+      acc_lim_theta: 3.2
+
       min_obstacle_dist: 0.1
       inflation_dist: 0.1
       costmap_converter_plugin: "costmap_converter::CostmapToPolygonsDBSMCCH"
@@ -39,10 +43,6 @@ controller_server:
       max_samples: 20
       max_global_plan_lookahead_dist: 1.0
       visualize_hc_graph: True
-      max_vel_x: 0.26
-      max_vel_theta: 1.0
-      acc_lim_x: 2.5
-      acc_lim_theta: 3.2
       min_turning_radius: 0.0
 
 controller_server_rclcpp_node:
