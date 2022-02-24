@@ -89,7 +89,7 @@ def parallel_compute_metrics(run_output_folder):
     shared_progress.value += 1
     if not silent:
         print(f"finish: compute_metrics {int(shared_progress.value * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
-    return results_df, run_parameter_names
+    return results_df, run_parameter_names, run_output_folder
 
 
 def main():
@@ -172,7 +172,9 @@ def main():
             print_info("main: metrics computation interrupted")
             sys.exit()
 
-        results_dfs, run_parameter_names_lists = zip(*results_dfs_and_parameter_names)
+        failed_metrics_computation_runs_ret = list(filter(lambda r_d: r_d[0] is None, results_dfs_and_parameter_names))
+
+        results_dfs, run_parameter_names_lists, compute_directories = zip(*results_dfs_and_parameter_names)
         results_dfs, run_parameter_names_lists = filter(lambda d: d is not None, results_dfs), filter(lambda x: x is not None, run_parameter_names_lists)
 
         all_results_df = pd.concat(results_dfs, sort=False)
@@ -183,6 +185,11 @@ def main():
         with open(results_info_path, 'w') as results_info_file:
             yaml.dump(results_info, results_info_file)
         print_info("finished writing results")
+
+        if len(failed_metrics_computation_runs_ret):
+            _, _, failed_metrics_computation_runs = zip(*failed_metrics_computation_runs_ret)
+            print_info(f"runs that failed metrics computation ({len(failed_metrics_computation_runs)}):")
+            print("\t" + '\n\t'.join(failed_metrics_computation_runs))
 
     if len(not_completed_run_folders):
         print_info("runs not completed:")
