@@ -9,6 +9,12 @@ from collections import defaultdict
 from os import path
 import numpy as np
 import pandas as pd
+import yaml
+from sensor_msgs.msg import LaserScan
+import sensor_msgs_py.point_cloud2 as pc2
+
+from local_planning_performance_modelling.laser_geometry import LaserProjection
+import shapely.geometry as shp
 
 from performance_modelling_py.metrics.localization_metrics import get_matrix_diff
 from performance_modelling_py.utils import print_error, print_info
@@ -106,11 +112,12 @@ def relative_2d_pose_transform(pose_a_1, pose_a_2, pose_b_1, pose_b_2):
 
 
 class TrajectoryLength:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "trajectory_length"
         self.version = 1
 
@@ -169,10 +176,11 @@ class TrajectoryLength:
 
 
 class ExecutionTime:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "execution_time"
         self.version = 1
 
@@ -217,10 +225,11 @@ class ExecutionTime:
 
 
 class SuccessRate:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "success_rate"
         self.version = 1
 
@@ -250,11 +259,94 @@ class SuccessRate:
         return True
 
 
+class CollisionRate:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
+        self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
+        self.run_info_path = path.join(run_output_folder, "run_info.yaml")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "collision_rate"
+        self.version = 2
+
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # check required files exist
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        if not path.isfile(self.scans_file_path):
+            print_error(f"{self.metric_name}: scans_file file not found:\n{self.scans_file_path}")
+            return False
+
+        if not path.isfile(self.local_costmap_params_path):
+            print_error(f"{self.metric_name}: local_costmap_params file not found:\n{self.local_costmap_params_path}")
+            return False
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
+
+        with open(self.local_costmap_params_path) as local_costmap_params_file:
+            local_costmap_params = yaml.safe_load(local_costmap_params_file)
+        footprint_points_list = yaml.safe_load(local_costmap_params['local_costmap']['local_costmap']['ros__parameters']['footprint'])
+        footprint_polygon = shp.Polygon(footprint_points_list)
+
+        # get base_scan offset for this robot
+        with open(self.run_info_path) as run_info_file:
+            run_info = yaml.safe_load(run_info_file)
+        robot_model_name = run_info['run_parameters']['robot_model']
+        if robot_model_name == 'turtlebot3_waffle_performance_modelling':  # TODO avoid hardcoding the offsets here
+            base_scan_x_offset = -0.064
+            base_scan_y_offset = 0.0
+        elif robot_model_name == 'hunter2':
+            base_scan_x_offset = 0.325
+            base_scan_y_offset = 0.115
+        else:
+            print_error(f"{self.metric_name}: robot_model_name not valid:\n{robot_model_name}")
+            return False
+
+        # get events info from run events
+        scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
+
+        collision = False
+        for i, scan_row in scans_df.iterrows():
+            laser_scan_msg = LaserScan()
+            laser_scan_msg.angle_min = float(scan_row[1])
+            laser_scan_msg.angle_max = float(scan_row[2])
+            laser_scan_msg.angle_increment = float(scan_row[3])
+            laser_scan_msg.range_min = float(scan_row[4])
+            laser_scan_msg.range_max = float(scan_row[5])
+            laser_scan_msg.ranges = list(map(float, scan_row[6:]))
+            pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
+            point_generator = pc2.read_points(pointcloud_msg)
+            for point_pc2 in point_generator:
+                if not np.isnan(point_pc2[0]):
+                    point = shp.Point(point_pc2[0] + base_scan_x_offset, point_pc2[1] + base_scan_y_offset)
+                    if footprint_polygon.contains(point):
+                        collision = True
+                        break
+            if collision:
+                break
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df[self.metric_name] = [int(collision)]
+        return True
+
+
 class CpuTimeAndMaxMemoryUsage:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.ps_snapshots_folder_path = path.join(run_output_folder, "benchmark_data", "ps_snapshots")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
         self.version = 1
 
@@ -325,15 +417,16 @@ class CpuTimeAndMaxMemoryUsage:
 
 
 class OdometryError:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.odometry_poses_file_path = path.join(run_output_folder, "benchmark_data", "odom.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "odometry_error"
-        self.version = 1
+        self.version = 2
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -403,7 +496,8 @@ class OdometryError:
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
         if len(localization_update_poses_df) == 0:
-            print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
+            if self.verbose:
+                print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
         localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
@@ -436,8 +530,14 @@ class OdometryError:
 
             # get start pose and end pose that most closely matches start and end times
             interpolated_df_clipped = interpolated_df[(start_timestamp <= interpolated_df.t) & (interpolated_df.t <= end_timestamp)]
-            if len(interpolated_df_clipped) == 0:
-                print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
+            if len(interpolated_df_clipped) < 1:
+                if self.verbose:
+                    print_info(f"{self.metric_name}: ground truth rate too low compared to localization update rate in update timestamps interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
+                continue
+            if len(interpolated_df[(interpolated_df.t < start_timestamp)]) < 1:
+                if self.verbose:
+                    if self.verbose:
+                        print_info(f"{self.metric_name}: not enough interpolated poses before update interval [{start_timestamp}, {end_timestamp}]:\n{self.ground_truth_poses_file_path}")
                 continue
             interpolated_start_poses = interpolated_df[(interpolated_df.t < start_timestamp)].iloc[-1]
             interpolated_end_poses = interpolated_df_clipped.iloc[-1]
@@ -472,6 +572,9 @@ class OdometryError:
                 odom_errors_alpha_2.append(relative_rotation_error/trajectory_translation)
                 odom_errors_alpha_3.append(relative_translation_error/trajectory_translation)
 
+        if len(odom_errors_alpha_1) == 0 or len(odom_errors_alpha_2) == 0 or len(odom_errors_alpha_3) == 0 or len(odom_errors_alpha_4) == 0:
+            print_error(f"{self.metric_name}: len(odom_errors_alpha_i) == 0:\n{self.ground_truth_poses_file_path}")
+
         self.results_df["odometry_error_alpha_1_mean"] = [float(np.mean(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
         self.results_df["odometry_error_alpha_1_std"] = [float(np.std(odom_errors_alpha_1)) if len(odom_errors_alpha_1) else np.nan]
         self.results_df["odometry_error_alpha_2_mean"] = [float(np.mean(odom_errors_alpha_2)) if len(odom_errors_alpha_2) else np.nan]
@@ -485,12 +588,13 @@ class OdometryError:
 
 
 class LocalizationError:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "localization_update_error"
         self.version = 1
 
@@ -554,7 +658,9 @@ class LocalizationError:
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
         if len(localization_update_poses_df) == 0:
-            print_info(f"{self.metric_name}: not enough localization update poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.localization_update_poses_file_path}")
+            if self.verbose:
+                if self.verbose:
+                    print_info(f"{self.metric_name}: not enough localization update poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.localization_update_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
         localization_update_poses_df = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]
@@ -643,11 +749,12 @@ class LocalizationError:
 
 
 class LocalizationUpdateRate:
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False):
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
         self.metric_name = "localization_update_rate"
         self.version = 1
 
@@ -692,18 +799,82 @@ class LocalizationUpdateRate:
         # get the dataframes for localization update poses
         localization_update_poses_df = pd.read_csv(self.localization_update_poses_file_path)
         if len(localization_update_poses_df) == 0:
-            print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
+            if self.verbose:
+                print_info(f"{self.metric_name}: no localization update poses in:\n{self.localization_update_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
         localization_update_timestamps = localization_update_poses_df[(navigation_start_time <= localization_update_poses_df.t) & (localization_update_poses_df.t <= navigation_end_time)]['t'].values
 
         if len(localization_update_timestamps) < 2:
-            print_info(f"{self.metric_name}: not enough localization update poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.localization_update_poses_file_path}")
+            if self.verbose:
+                print_info(f"{self.metric_name}: not enough localization update poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.localization_update_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
 
         localization_update_deltas = localization_update_timestamps[1:] - localization_update_timestamps[0:-1]
         self.results_df["localization_update_rate_mean"] = [float(np.mean(localization_update_deltas))]
         self.results_df["localization_update_rate_std"] = [float(np.std(localization_update_deltas))]
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        return True
+
+
+class MotionCharacteristics:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "motion_characteristics"
+        self.version = 1
+
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df["average_translation_velocity"] = [np.nan]
+        self.results_df["average_rotation_velocity"] = [np.nan]
+
+        # check required files exist
+        if not path.isfile(self.ground_truth_poses_file_path):
+            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
+            return False
+
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        # get timestamps info from run events
+        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
+        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
+        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
+        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
+
+        if len(navigation_start_events) != 1:
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        navigation_start_time = navigation_start_events.iloc[0].t
+        navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
+
+        # get the dataframes for ground truth poses
+        ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
+        ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
+
+        average_translation_velocity = np.mean(np.abs(ground_truth_poses_df['v_x']))
+        average_rotation_velocity = np.mean(np.abs(ground_truth_poses_df['v_theta']))
+
+        self.results_df["average_translation_velocity"] = [float(average_translation_velocity)]
+        self.results_df["average_rotation_velocity"] = [float(average_rotation_velocity)]
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True

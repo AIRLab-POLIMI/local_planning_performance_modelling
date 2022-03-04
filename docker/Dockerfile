@@ -21,6 +21,7 @@ RUN \
     htop \
     nano \
     python3-pandas \
+    python3-shapely \
     python3-yaml \
     python3-termcolor \
     python3-psutil \

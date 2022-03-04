@@ -1,0 +1,31 @@
+environments_dataset: ~/ds/performance_modelling/test_datasets/dataset
+robots_dataset: ~/ds/performance_modelling/test_datasets/robots
+
+source_workspace_path: ~/w/ros2_ws/src/
+components_configurations_folder: ~/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations
+gazebo_model_path_env_var: [~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
+gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
+
+supervisor_component: local_planning_benchmark_supervisor
+
+hunter2_wheelbase: 0.65
+hunter2_footprint: [[0.87, 0.47], [0.87, -0.47], [-0.20, -0.47], [-0.20, 0.47]]  # padded with 5 cm
+turtlebot_wheelbase: 0.177
+turtlebot_footprint: [[0.1185, 0.203], [0.1185, -0.203], [-0.2465, -0.203], [-0.2465, 0.203]]  # padded with 5 cm
+
+amcl_ground_truth_alpha: [0.01, 0.0, 0.01, 0.0]
+
+environment_type: simulation
+
+components_configuration:
+  supervisor: supervisor/local_planning_benchmark_supervisor.yaml
+  amcl: localization/amcl.yaml
+  localization_generator: localization/localization_generator.yaml
+  nav2_navigation: navigation_stack/navigation.yaml
+  behaviour_tree: navigation_stack/navigate_w_replanning.xml
+  rpp: navigation_stack/rpp.yaml
+  teb: navigation_stack/teb.yaml
+  dwb: navigation_stack/dwb.yaml
+  navfn: navigation_stack/navfn.yaml
+  smac: navigation_stack/smac.yaml
+  rviz: rviz/nav2_default_view.rviz

@@ -18,7 +18,7 @@ from performance_modelling_py.component_proxies.ros2_component import Component,
 
 
 class BenchmarkRun(object):
-    def __init__(self, run_id, run_output_folder, benchmark_log_path, environment_folder, parameters_combination_dict, benchmark_configuration_dict, args_parser):
+    def __init__(self, run_id, run_output_folder, benchmark_log_path, parameters_combination_dict, benchmark_configuration_dict, args_parser):
 
         # run configuration
         self.run_id = run_id
@@ -34,8 +34,8 @@ class BenchmarkRun(object):
         # environment parameters
         robots_dataset_folder = path.expanduser(self.benchmark_configuration['robots_dataset'])
 
-        self.environment_folder = environment_folder
-        self.map_info_file_path = path.join(environment_folder, "data", "map.yaml")
+        self.environment_folder = path.join(path.expanduser(self.benchmark_configuration['environments_dataset']), self.run_parameters['environment_name'])
+        self.map_info_file_path = path.join(self.environment_folder, "data", "map.yaml")
         self.gazebo_model_path_env_var = ":".join(map(
             lambda p: path.expanduser(p),
             self.benchmark_configuration['gazebo_model_path_env_var'] + [path.dirname(path.abspath(self.environment_folder)), self.run_output_folder]
@@ -58,6 +58,8 @@ class BenchmarkRun(object):
         localization_generator_update_rate = None
         localization_generator_translation_error = None
         localization_generator_rotation_error = None
+        localization_generator_normalized_relative_translation_error = None
+        localization_generator_normalized_relative_rotation_error = None
         if self.localization_node == 'amcl':
             amcl_alpha_factor = self.run_parameters['amcl_alpha_factor']
             if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
@@ -68,6 +70,8 @@ class BenchmarkRun(object):
             localization_generator_update_rate = self.run_parameters['localization_generator_update_rate']
             localization_generator_translation_error = self.run_parameters['localization_generator_translation_error']
             localization_generator_rotation_error = self.run_parameters['localization_generator_rotation_error']
+            localization_generator_normalized_relative_translation_error = self.run_parameters['localization_generator_normalized_relative_translation_error']
+            localization_generator_normalized_relative_rotation_error = self.run_parameters['localization_generator_normalized_relative_rotation_error']
         else:
             raise ValueError()
 
@@ -115,7 +119,7 @@ class BenchmarkRun(object):
         self.original_rviz_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['rviz'])
         original_local_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][local_planner_node])
         original_global_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][global_planner_node])
-        original_gazebo_world_model_path = path.join(environment_folder, "gazebo", "gazebo_environment.model")
+        original_gazebo_world_model_path = path.join(self.environment_folder, "gazebo", "gazebo_environment.model")
         original_gazebo_robot_model_config_path = path.join(robots_dataset_folder, robot_model, "model.config")
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
@@ -153,6 +157,13 @@ class BenchmarkRun(object):
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['use_sim_time'] = self.use_sim_time
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['ground_truth_map_info_path'] = self.map_info_file_path
         supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['goal_obstacle_min_distance'] = goal_obstacle_min_distance
+        if self.localization_node == 'amcl':
+            supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['estimated_pose_correction_topic'] = "/amcl_pose"
+        elif self.localization_node == 'localization_generator':
+            supervisor_configuration['local_planning_benchmark_supervisor']['ros__parameters']['estimated_pose_correction_topic'] = "/generated_pose"
+        else:
+            raise ValueError()
+
         if not path.exists(path.dirname(self.supervisor_configuration_path)):
             os.makedirs(path.dirname(self.supervisor_configuration_path))
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
@@ -170,6 +181,8 @@ class BenchmarkRun(object):
             localization_configuration['localization_generator']['ros__parameters']['update_pose_rate'] = localization_generator_update_rate
             localization_configuration['localization_generator']['ros__parameters']['translation_error'] = localization_generator_translation_error
             localization_configuration['localization_generator']['ros__parameters']['rotation_error'] = localization_generator_rotation_error
+            localization_configuration['localization_generator']['ros__parameters']['normalized_relative_translation_error'] = localization_generator_normalized_relative_translation_error
+            localization_configuration['localization_generator']['ros__parameters']['normalized_relative_rotation_error'] = localization_generator_normalized_relative_rotation_error
         else:
             raise ValueError()
         if not path.exists(path.dirname(self.localization_configuration_path)):
@@ -281,7 +294,7 @@ class BenchmarkRun(object):
         run_info_dict = dict()
         run_info_dict["run_id"] = self.run_id
         run_info_dict["run_folder"] = self.run_output_folder
-        run_info_dict["environment_folder"] = environment_folder
+        run_info_dict["environment_folder"] = self.environment_folder
         run_info_dict["run_parameters"] = self.run_parameters
         run_info_dict["local_components_configuration"] = {
             'supervisor': supervisor_configuration_relative_path,

@@ -17,7 +17,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from performance_modelling_py.utils import print_info, print_error
-from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, LocalizationUpdateRate
+from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, LocalizationUpdateRate, CollisionRate, MotionCharacteristics
 
 
 def compute_run_metrics(run_output_folder):
@@ -47,13 +47,15 @@ def compute_run_metrics(run_output_folder):
 
     # compute metrics
     metrics_to_compute = [
-        CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        LocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
-        LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics),
+        CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        TrajectoryLength(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        ExecutionTime(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        SuccessRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        CollisionRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        OdometryError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        LocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        MotionCharacteristics(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
     ]
 
     success = True
@@ -87,7 +89,7 @@ def parallel_compute_metrics(run_output_folder):
     shared_progress.value += 1
     if not silent:
         print(f"finish: compute_metrics {int(shared_progress.value * 100 / shared_num_runs.value):3d}% {path.basename(run_output_folder)}")
-    return results_df, run_parameter_names
+    return results_df, run_parameter_names, run_output_folder
 
 
 def main():
@@ -141,7 +143,7 @@ def main():
     def is_not_completed_run_folder(p):
         return path.isdir(p) and not path.exists(path.join(p, "RUN_COMPLETED"))
 
-    run_folders = list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder))))
+    run_folders = sorted(list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
     not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
 
     if len(run_folders) == 0:
@@ -170,7 +172,9 @@ def main():
             print_info("main: metrics computation interrupted")
             sys.exit()
 
-        results_dfs, run_parameter_names_lists = zip(*results_dfs_and_parameter_names)
+        failed_metrics_computation_runs_ret = list(filter(lambda r_d: r_d[0] is None, results_dfs_and_parameter_names))
+
+        results_dfs, run_parameter_names_lists, compute_directories = zip(*results_dfs_and_parameter_names)
         results_dfs, run_parameter_names_lists = filter(lambda d: d is not None, results_dfs), filter(lambda x: x is not None, run_parameter_names_lists)
 
         all_results_df = pd.concat(results_dfs, sort=False)
@@ -181,6 +185,11 @@ def main():
         with open(results_info_path, 'w') as results_info_file:
             yaml.dump(results_info, results_info_file)
         print_info("finished writing results")
+
+        if len(failed_metrics_computation_runs_ret):
+            _, _, failed_metrics_computation_runs = zip(*failed_metrics_computation_runs_ret)
+            print_info(f"runs that failed metrics computation ({len(failed_metrics_computation_runs)}):")
+            print("\t" + '\n\t'.join(failed_metrics_computation_runs))
 
     if len(not_completed_run_folders):
         print_info("runs not completed:")
