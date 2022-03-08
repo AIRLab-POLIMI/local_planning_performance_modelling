@@ -826,7 +826,7 @@ class MotionCharacteristics:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "motion_characteristics"
-        self.version = 1
+        self.version = 2
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -838,6 +838,7 @@ class MotionCharacteristics:
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["average_translation_velocity"] = [np.nan]
         self.results_df["average_rotation_velocity"] = [np.nan]
+        self.results_df["translation_rotation_product"] = [np.nan]
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
@@ -873,8 +874,10 @@ class MotionCharacteristics:
 
         average_translation_velocity = np.mean(np.abs(ground_truth_poses_df['v_x']))
         average_rotation_velocity = np.mean(np.abs(ground_truth_poses_df['v_theta']))
+        translation_rotation_product = np.mean(np.abs(ground_truth_poses_df['v_x']) * np.abs(ground_truth_poses_df['v_theta']))
 
         self.results_df["average_translation_velocity"] = [float(average_translation_velocity)]
         self.results_df["average_rotation_velocity"] = [float(average_rotation_velocity)]
+        self.results_df["translation_rotation_product"] = [float(translation_rotation_product)]
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
