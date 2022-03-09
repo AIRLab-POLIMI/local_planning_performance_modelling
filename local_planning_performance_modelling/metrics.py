@@ -826,7 +826,7 @@ class MotionCharacteristics:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "motion_characteristics"
-        self.version = 2
+        self.version = 3
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -839,6 +839,9 @@ class MotionCharacteristics:
         self.results_df["average_translation_velocity"] = [np.nan]
         self.results_df["average_rotation_velocity"] = [np.nan]
         self.results_df["translation_rotation_product"] = [np.nan]
+        self.results_df["average_translation_acceleration"] = [np.nan]
+        self.results_df["average_rotation_acceleration"] = [np.nan]
+        self.results_df["translation_rotation_acceleration_product"] = [np.nan]
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
@@ -872,12 +875,20 @@ class MotionCharacteristics:
         ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
         ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
 
-        average_translation_velocity = np.mean(np.abs(ground_truth_poses_df['v_x']))
-        average_rotation_velocity = np.mean(np.abs(ground_truth_poses_df['v_theta']))
-        translation_rotation_product = np.mean(np.abs(ground_truth_poses_df['v_x']) * np.abs(ground_truth_poses_df['v_theta']))
+        # compute derivative of velocity
+        ground_truth_poses_df = ground_truth_poses_df.rolling(11, center=True).mean()
+        ground_truth_poses_df['v_tran'] = np.sqrt(ground_truth_poses_df.v_x**2 + ground_truth_poses_df.v_y**2)
+        ground_truth_poses_df['v_rot'] = ground_truth_poses_df.v_theta
+        diff_df = ground_truth_poses_df.diff()
+        diff_df['a_tran'] = np.sqrt((diff_df.v_x/diff_df.t)**2 + (diff_df.v_y/diff_df.t)**2)
+        diff_df['a_rot'] = diff_df.v_theta/diff_df.t
+        diff_df = diff_df.rolling(11, center=True).mean()
 
-        self.results_df["average_translation_velocity"] = [float(average_translation_velocity)]
-        self.results_df["average_rotation_velocity"] = [float(average_rotation_velocity)]
-        self.results_df["translation_rotation_product"] = [float(translation_rotation_product)]
+        self.results_df["average_translation_velocity"] = [float(np.mean(np.abs(ground_truth_poses_df.v_tran)))]
+        self.results_df["average_rotation_velocity"] = [float(np.mean(np.abs(ground_truth_poses_df.v_rot)))]
+        self.results_df["translation_rotation_product"] = [float(np.mean(np.abs(ground_truth_poses_df.v_tran) * np.abs(ground_truth_poses_df.v_rot)))]
+        self.results_df["average_translation_acceleration"] = [float(np.mean(np.abs(diff_df.a_tran)))]
+        self.results_df["average_rotation_acceleration"] = [float(np.mean(np.abs(diff_df.a_rot)))]
+        self.results_df["translation_rotation_acceleration_product"] = [float(np.mean(np.abs(diff_df.a_tran) * np.abs(diff_df.a_rot)))]
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
