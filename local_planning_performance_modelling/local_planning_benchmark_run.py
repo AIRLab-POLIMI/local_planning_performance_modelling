@@ -246,6 +246,15 @@ class BenchmarkRun(object):
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = hunter2_min_turning_radius
             else:
                 raise ValueError()
+        elif local_planner_node == 'rpp':
+            if robot_model == 'turtlebot3_waffle_performance_modelling':
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['use_rotate_to_heading'] = True
+            elif robot_model == 'hunter2':
+                local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['use_rotate_to_heading'] = False
+            else:
+                raise ValueError()
+        else:
+            raise ValueError()
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
             os.makedirs(path.dirname(self.local_planner_configuration_path))
         with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
