@@ -1,36 +1,33 @@
-local_planning_benchmark_supervisor:
-  ros__parameters:
+# run parameters
+initial_pose_std_xy: 0.2
+initial_pose_std_theta: 0.2617
+goal_tolerance: 0.4
+run_timeout: 1200.0
+ps_snapshot_period: 1.0
+write_estimated_poses_period: 0.1
 
-    # run parameters
-    initial_pose_std_xy: 0.2
-    initial_pose_std_theta: 0.2617
-    goal_tolerance: 0.4
-    run_timeout: 1200.0
-    ps_snapshot_period: 1.0
-    write_estimated_poses_period: 0.1
+# topic names
+scan_topic: /scan
+cmd_vel_topic: /cmd_vel
+odom_topic: /odom
+ground_truth_pose_topic: /ground_truth_odom
+goal_pose_topic: /goal_pose
+navigation_transition_event_topic: /bt_navigator/transition_event
 
-    # topic names
-    scan_topic: /scan
-    cmd_vel_topic: /cmd_vel
-    odom_topic: /odom
-    ground_truth_pose_topic: /ground_truth_odom
-    goal_pose_topic: /goal_pose
-    navigation_transition_event_topic: /bt_navigator/transition_event
+# service names
+lifecycle_manager_service: /lifecycle_manager/manage_nodes
+local_costmap_get_parameters_service: /local_costmap/local_costmap/get_parameters
+global_costmap_get_parameters_service: /global_costmap/global_costmap/get_parameters
+pause_physics_service: /pause_physics
+unpause_physics_service: /unpause_physics
+set_entity_state_service: /set_entity_state
 
-    # service names
-    lifecycle_manager_service: /lifecycle_manager/manage_nodes
-    local_costmap_get_parameters_service: /local_costmap/local_costmap/get_parameters
-    global_costmap_get_parameters_service: /global_costmap/global_costmap/get_parameters
-    pause_physics_service: /pause_physics
-    unpause_physics_service: /unpause_physics
-    set_entity_state_service: /set_entity_state
+# action names
+navigate_to_pose_action: /navigate_to_pose
 
-    # action names
-    navigate_to_pose_action: /navigate_to_pose
+# frame names
+fixed_frame: map
+robot_base_frame: base_link
 
-    # frame names
-    fixed_frame: map
-    robot_base_frame: base_link
-
-    # gazebo entity names
-    robot_entity_name: robot  # base_footprint
+# gazebo entity names
+robot_entity_name: robot  # base_footprint

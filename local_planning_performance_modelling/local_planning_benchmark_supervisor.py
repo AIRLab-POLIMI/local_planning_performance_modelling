@@ -4,31 +4,20 @@ import random
 import time
 import traceback
 
-import geometry_msgs
-import lifecycle_msgs
-import nav_msgs
 import networkx as nx
 import numpy as np
 import pandas as pd
 import pyquaternion
-import rclpy
 import yaml
-from action_msgs.msg import GoalStatus
-from gazebo_msgs.srv import SetEntityState
-from nav2_msgs.action import NavigateToPose
-from nav2_msgs.srv import ManageLifecycleNodes
-from nav_msgs.msg import Odometry
-from performance_modelling_py.environment import ground_truth_map
-from rcl_interfaces.srv import GetParameters
-from rclpy.action import ActionClient
-from rclpy.node import Node
-from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped, PoseWithCovarianceStamped
-from lifecycle_msgs.msg import TransitionEvent
-from rclpy.qos import qos_profile_sensor_data, qos_profile_parameter_events
-from rclpy.time import Time
-from sensor_msgs.msg import LaserScan
 
+import rospy
 import tf2_ros
+from actionlib import SimpleActionClient
+from actionlib_msgs.msg import GoalStatus
+from move_base_msgs.msg import MoveBaseGoal, MoveBaseAction
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped, PoseWithCovarianceStamped
+from sensor_msgs.msg import LaserScan
 
 import copy
 import pickle
@@ -37,16 +26,16 @@ import psutil
 import os
 from os import path
 
-from performance_modelling_py.utils import print_info, print_error, nanoseconds_to_seconds
-from std_srvs.srv import Empty
+from performance_modelling_py.environment import ground_truth_map
+from performance_modelling_py.utils import print_info, print_error
 
 
 class RunFailException(Exception):
     pass
 
 
-def main(args=None):
-    rclpy.init(args=args)
+def main():
+    rospy.init_node('benchmark_supervisor', anonymous=False)
 
     node = None
 
@@ -54,22 +43,25 @@ def main(args=None):
     try:
         node = LocalPlanningBenchmarkSupervisor()
         node.start_run()
-        rclpy.spin(node)
+        rospy.spin()
 
     except KeyboardInterrupt:
         node.ros_shutdown_callback()
     except RunFailException as e:
         print_error(e)
     except Exception:
-        print_error("main: exception raised during rclpy.spin:")
+        print_error("main: exception raised during rospy.spin:")
         print_error(traceback.format_exc())
 
     finally:
         if node is not None:
             node.end_run()
+        if not rospy.is_shutdown():
+            print_info("calling rospy signal_shutdown")
+            rospy.signal_shutdown("run_terminated")
 
 
-class LocalPlanningBenchmarkSupervisor(Node):
+class LocalPlanningBenchmarkSupervisor:
     def __init__(self):
         super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
@@ -77,43 +69,37 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.prevent_shutdown = False  # Should be False, unless you are currently debugging. if True, runs will never end.
 
         # topics, services, actions, entities and frames names
-        scan_topic = self.get_parameter('scan_topic').value
-        cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
-        odom_topic = self.get_parameter('odom_topic').value
-        ground_truth_pose_topic = self.get_parameter('ground_truth_pose_topic').value
-        estimated_pose_correction_topic = self.get_parameter('estimated_pose_correction_topic').value
-        goal_pose_topic = self.get_parameter('goal_pose_topic').value
-        navigation_transition_event_topic = self.get_parameter('navigation_transition_event_topic').value
-        lifecycle_manager_service = self.get_parameter('lifecycle_manager_service').value
-        global_costmap_get_parameters_service = self.get_parameter('global_costmap_get_parameters_service').value
-        pause_physics_service = self.get_parameter('pause_physics_service').value
-        unpause_physics_service = self.get_parameter('unpause_physics_service').value
-        set_entity_state_service = self.get_parameter('set_entity_state_service').value
-        navigate_to_pose_action = self.get_parameter('navigate_to_pose_action').value
-        self.fixed_frame = self.get_parameter('fixed_frame').value
-        self.robot_base_frame = self.get_parameter('robot_base_frame').value
-        self.robot_entity_name = self.get_parameter('robot_entity_name').value
+        scan_topic = rospy.get_param('~scan_topic')
+        cmd_vel_topic = rospy.get_param('~cmd_vel_topic')
+        odom_topic = rospy.get_param('~odom_topic')
+        ground_truth_pose_topic = rospy.get_param('~ground_truth_pose_topic')
+        estimated_pose_correction_topic = rospy.get_param('~estimated_pose_correction_topic')
+        goal_pose_topic = rospy.get_param('~goal_pose_topic')
+        navigate_to_pose_action = rospy.get_param('~navigate_to_pose_action')
+        self.fixed_frame = rospy.get_param('~fixed_frame')
+        self.robot_base_frame = rospy.get_param('~robot_base_frame')
+        self.robot_entity_name = rospy.get_param('~robot_entity_name')
 
         # file system paths
-        self.run_output_folder = self.get_parameter('run_output_folder').value
+        self.run_output_folder = rospy.get_param('~run_output_folder')
         self.benchmark_data_folder = path.join(self.run_output_folder, "benchmark_data")
         self.ps_output_folder = path.join(self.benchmark_data_folder, "ps_snapshots")
-        self.ground_truth_map_info_path = self.get_parameter("ground_truth_map_info_path").value
+        self.ground_truth_map_info_path = rospy.get_param('~ground_truth_map_info_path')
 
         # run parameters
-        self.run_index = self.get_parameter('run_index').value
-        run_timeout = self.get_parameter('run_timeout').value
-        ps_snapshot_period = self.get_parameter('ps_snapshot_period').value
-        write_estimated_poses_period = self.get_parameter('write_estimated_poses_period').value
-        self.ps_pid_father = self.get_parameter('pid_father').value
+        self.run_index = rospy.get_param('~run_index')
+        self.run_timeout = rospy.get_param('~run_timeout')
+        ps_snapshot_period = rospy.get_param('~ps_snapshot_period')
+        write_estimated_poses_period = rospy.get_param('~write_estimated_poses_period')
+        self.ps_pid_father = rospy.get_param('~pid_father')
         self.ps_processes = psutil.Process(self.ps_pid_father).children(recursive=True)  # list of processes children of the benchmark script, i.e., all ros nodes of the benchmark including this one
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.ground_truth_map_info_path)
         self.initial_pose_covariance_matrix = np.zeros((6, 6), dtype=float)
-        self.initial_pose_covariance_matrix[0, 0] = self.get_parameter('initial_pose_std_xy').value**2
-        self.initial_pose_covariance_matrix[1, 1] = self.get_parameter('initial_pose_std_xy').value**2
-        self.initial_pose_covariance_matrix[5, 5] = self.get_parameter('initial_pose_std_theta').value**2
-        self.goal_tolerance = self.get_parameter('goal_tolerance').value
-        self.goal_obstacle_min_distance = self.get_parameter('goal_obstacle_min_distance').value
+        self.initial_pose_covariance_matrix[0, 0] = rospy.get_param('~initial_pose_std_xy')**2
+        self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
+        self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
+        self.goal_tolerance = rospy.get_param('~goal_tolerance')
+        self.goal_obstacle_min_distance = rospy.get_param('~goal_obstacle_min_distance')
 
         # run variables
         self.run_started = False
@@ -152,60 +138,45 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.run_data = dict()
 
         # setup timers
-        self.create_timer(run_timeout, self.run_timeout_callback)
-        self.create_timer(ps_snapshot_period, self.ps_snapshot_timer_callback)
-        self.create_timer(write_estimated_poses_period, self.write_estimated_pose_timer_callback)
-
-        # setup service clients
-        self.lifecycle_manager_service_client = self.create_client(ManageLifecycleNodes, lifecycle_manager_service)
-        self.global_costmap_get_parameters_service_client = self.create_client(GetParameters, global_costmap_get_parameters_service)
-        self.pause_physics_service_client = self.create_client(Empty, pause_physics_service)
-        self.unpause_physics_service_client = self.create_client(Empty, unpause_physics_service)
-        self.set_entity_state_service_client = self.create_client(SetEntityState, set_entity_state_service)
+        rospy.Timer(rospy.Duration.from_sec(self.run_timeout), self.run_timeout_callback)
+        rospy.Timer(rospy.Duration.from_sec(ps_snapshot_period), self.ps_snapshot_timer_callback)
+        rospy.Timer(rospy.Duration.from_sec(write_estimated_poses_period), self.write_estimated_pose_timer_callback)
 
         # setup buffers
         self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # setup publishers
-        self.goal_pose_publisher = self.create_publisher(PoseStamped, goal_pose_topic, 1)
+        self.goal_pose_publisher = rospy.Publisher(goal_pose_topic, PoseStamped, queue_size=1)
 
         # setup subscribers
-        self.create_subscription(LaserScan, scan_topic, self.scan_callback, qos_profile_sensor_data)
-        self.create_subscription(Twist, cmd_vel_topic, self.cmd_vel_callback, qos_profile_sensor_data)
-        self.create_subscription(PoseWithCovarianceStamped, estimated_pose_correction_topic, self.estimated_pose_correction_callback, qos_profile_sensor_data)
-        self.create_subscription(Odometry, odom_topic, self.odom_callback, qos_profile_sensor_data)
-        self.create_subscription(Odometry, ground_truth_pose_topic, self.ground_truth_pose_callback, qos_profile_sensor_data)
-        self.create_subscription(TransitionEvent, navigation_transition_event_topic, self.lifecycle_transition_event_callback, qos_profile_parameter_events)
+        rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
+        rospy.Subscriber(cmd_vel_topic, Twist, self.cmd_vel_callback, queue_size=1)
+        rospy.Subscriber(estimated_pose_correction_topic, PoseWithCovarianceStamped, self.estimated_pose_correction_callback, queue_size=1)
+        rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
+        rospy.Subscriber(ground_truth_pose_topic, Odometry, self.ground_truth_pose_callback, queue_size=1)
 
         # setup action clients
-        self.navigate_to_pose_action_client = ActionClient(self, NavigateToPose, navigate_to_pose_action)
-        self.navigate_to_pose_action_goal_future = None
-        self.navigate_to_pose_action_result_future = None
+        self.navigate_to_pose_action_client = SimpleActionClient(navigate_to_pose_action, MoveBaseAction)
 
     def start_run(self):
-        print_info("waiting simulator and navigation stack", logger=self.get_logger().info)
+        print_info("waiting simulator and navigation stack", logger=rospy.loginfo)
 
-        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup) and for the navigation stack to activate
+        # wait to receive sensor data from the environment (e.g., a simulator may need time to startup)
         waiting_time = 0.0
         total_waiting_time = 0.0
         waiting_period = 0.5
-        while not self.received_first_scan or not self.navigation_node_activated:
-            if not rclpy.ok():
-                self.get_logger().fatal("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
-                raise RunFailException("ros shutdown while waiting to receive first sensor message from environment and navigation to be activated")
-
+        while not self.received_first_scan and not rospy.is_shutdown():
             time.sleep(waiting_period)
-            rclpy.spin_once(self)
             waiting_time += waiting_period
             total_waiting_time += waiting_period
             if waiting_time > 5.0:
-                self.get_logger().warning("still waiting to receive first sensor message from environment and navigation to be activated")
+                rospy.logwarn('still waiting to receive first sensor message from environment')
                 waiting_time = 0.0
             if total_waiting_time > 60.0:
-                self.get_logger().fatal("timed out waiting to receive first sensor message from environment and navigation to be activated")
-                raise RunFailException("timed out waiting to receive first sensor message from environment and navigation to be activated")
-        print_info("finished waiting to receive first sensor message from environment and navigation to be activated", logger=self.get_logger().info)
+                rospy.logfatal("timed out waiting to receive first sensor message from environment")
+                raise RunFailException("timed out waiting to receive first sensor message from environment")
+        print_info("finished waiting to receive first sensor message from environment", logger=rospy.loginfo)
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
@@ -228,7 +199,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
         # convert Voronoi node to pose
         self.goal_pose = PoseStamped()
-        self.goal_pose.header.stamp = self.get_clock().now().to_msg()
+        self.goal_pose.header.stamp = rospy.Time.now()
         self.goal_pose.header.frame_id = self.fixed_frame
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
@@ -241,26 +212,57 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.send_goal()
 
     def send_goal(self):
-
-        if not self.navigate_to_pose_action_client.wait_for_server(timeout_sec=5.0):
+        if not self.navigate_to_pose_action_client.wait_for_server(timeout=rospy.Duration.from_sec(5.0)):
             self.write_event('failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
 
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = self.goal_pose
-        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg = MoveBaseGoal()
+        goal_msg.target_pose.header.stamp = rospy.Time.now()
+        goal_msg.target_pose.header.frame_id = self.fixed_frame
+        goal_msg.target_pose.pose = self.goal_pose
 
-        self.navigate_to_pose_action_goal_future = self.navigate_to_pose_action_client.send_goal_async(goal_msg)
-        self.navigate_to_pose_action_goal_future.add_done_callback(self.goal_response_callback)
+        self.navigate_to_pose_action_client.send_goal(goal_msg)
         self.write_event('navigation_goal_sent')
+        self.write_event('navigation_goal_accepted')
+
         self.run_data["goal_pose"] = self.goal_pose.pose
         self.run_data["voronoi_node_index"] = self.pseudo_random_voronoi_index
+
+        if not self.navigate_to_pose_action_client.wait_for_result(timeout=rospy.Duration.from_sec(self.run_timeout)):
+            self.write_event('waypoint_timeout')
+            self.write_event('supervisor_finished')
+            raise RunFailException("waypoint_timeout")
+
+        self.run_data["navigation_final_status"] = self.navigate_to_pose_action_client.get_state()
+        if self.navigate_to_pose_action_client.get_state() == GoalStatus.SUCCEEDED:
+            self.write_event('navigation_succeeded')
+            goal_position = self.goal_pose.pose.position
+            if self.latest_estimated_position is not None:
+                current_position = self.latest_estimated_position
+                distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
+                if distance_from_goal < self.goal_tolerance:
+                    self.write_event('navigation_goal_reached')
+                else:
+                    rospy.logerr("goal status succeeded but current position farther from goal position than tolerance")
+                    self.write_event('navigation_goal_not_reached')
+            else:
+                rospy.logfatal("estimated position not set")
+                self.write_event('estimated_position_not_received')
+                if not self.prevent_shutdown:
+                    rospy.signal_shutdown("estimated position not set")
+        else:
+            print_info('navigation action failed with status {}, {}'.format(self.navigate_to_pose_action_client.get_state(), self.navigate_to_pose_action_client.get_goal_status_text()), logger=rospy.loginfo)
+            self.write_event('navigation_failed')
+
+        self.write_event('run_completed')
+        if not self.prevent_shutdown:
+            rospy.signal_shutdown('run completed')
 
     def ros_shutdown_callback(self):
         """
         This function is called when the node receives an interrupt signal (KeyboardInterrupt).
         """
-        print_info("asked to shutdown, terminating run", logger=self.get_logger().info)
+        print_info("asked to shutdown, terminating run", logger=rospy.loginfo)
         self.write_event('ros_shutdown')
         self.write_event('supervisor_finished')
 
@@ -278,68 +280,18 @@ class LocalPlanningBenchmarkSupervisor(Node):
         with open(self.run_data_file_path, 'w') as run_data_file:
             yaml.dump(self.run_data, run_data_file)
 
-    def goal_response_callback(self, future):
-        goal_handle = future.result()
-
-        # if the goal is rejected try with the next goal
-        if not goal_handle.accepted:
-            self.get_logger().error('navigation action goal rejected')
-            self.write_event('navigation_goal_rejected')
-            if not self.prevent_shutdown:
-                rclpy.shutdown()
-            return
-
-        self.write_event('navigation_goal_accepted')
-
-        self.navigate_to_pose_action_result_future = goal_handle.get_result_async()
-        self.navigate_to_pose_action_result_future.add_done_callback(self.get_result_callback)
-
-    def get_result_callback(self, future):
-        status = future.result().status
-        self.run_data["navigation_final_status"] = status
-
-        if status == GoalStatus.STATUS_SUCCEEDED:
-            self.write_event('navigation_succeeded')
-            goal_position = self.goal_pose.pose.position
-            if self.latest_estimated_position is not None:
-                current_position = self.latest_estimated_position
-                distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
-                if distance_from_goal < self.goal_tolerance:
-                    self.write_event('navigation_goal_reached')
-                else:
-                    self.get_logger().error("goal status succeeded but current position farther from goal position than tolerance")
-                    self.write_event('navigation_goal_not_reached')
-            else:
-                self.get_logger().fatal("estimated position not set")
-                self.write_event('estimated_position_not_received')
-                if not self.prevent_shutdown:
-                    rclpy.shutdown()
-        else:
-            print_info('navigation action failed with status {}'.format(status), logger=self.get_logger().info)
-            self.write_event('navigation_failed')
-
-        self.write_event('run_completed')
-        if not self.prevent_shutdown:
-            rclpy.shutdown()
-
-    def lifecycle_transition_event_callback(self, transition_event_msg: lifecycle_msgs.msg.TransitionEvent):
-        # send the initial pose as soon as the localization node activates the first time
-        if transition_event_msg.goal_state.label == 'active' and not self.navigation_node_activated:
-            self.navigation_node_activated = True
-            self.write_event("navigation_node_activated")
-
-    def run_timeout_callback(self):
-        self.get_logger().error("terminating supervisor due to timeout, terminating run")
+    def run_timeout_callback(self, _):
+        print_error("terminating supervisor due to timeout, terminating run")
         self.write_event('run_timeout')
-        if not self.prevent_shutdown:
-            self.destroy_node()
+        self.write_event('supervisor_finished')
+        rospy.signal_shutdown("run_timeout")
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
         if not self.run_started:
             return
 
-        msg_time = nanoseconds_to_seconds(laser_scan_msg.header.stamp.nanosec) + float(laser_scan_msg.header.stamp.sec)
+        msg_time = laser_scan_msg.header.stamp.to_sec()
         with open(self.scans_file_path, 'a') as scans_file:
             scans_file.write("{t}, {angle_min}, {angle_max}, {angle_increment}, {range_min}, {range_max}, {ranges}\n".format(
                 t=msg_time,
@@ -350,12 +302,12 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 range_max=laser_scan_msg.range_max,
                 ranges=', '.join(map(str, laser_scan_msg.ranges))))
 
-    def cmd_vel_callback(self, twist_msg: Twist):
+    def cmd_vel_callback(self, twist_msg):
         if not self.run_started:
             return
 
         self.cmd_vel_df = self.cmd_vel_df.append({
-            't': nanoseconds_to_seconds(self.get_clock().now().nanoseconds),
+            't': rospy.Time.now().to_sec(),
             'linear_x': twist_msg.linear.x,
             'linear_y': twist_msg.linear.y,
             'linear_z': twist_msg.linear.z,
@@ -366,13 +318,13 @@ class LocalPlanningBenchmarkSupervisor(Node):
 
     def write_estimated_pose_timer_callback(self):
         try:
-            transform_msg = self.tf_buffer.lookup_transform(self.fixed_frame, self.robot_base_frame, Time())
+            transform_msg = self.tf_buffer.lookup_transform(self.fixed_frame, self.robot_base_frame, rospy.Time())
             self.latest_estimated_position = transform_msg.transform.translation  # save the latest position to check if the robot has reached the goal within tolerance
             orientation = transform_msg.transform.rotation
             theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
             self.estimated_poses_df = self.estimated_poses_df.append({
-                't': nanoseconds_to_seconds(Time.from_msg(transform_msg.header.stamp).nanoseconds),
+                't': transform_msg.header.stamp.to_sec(),
                 'x': transform_msg.transform.translation.x,
                 'y': transform_msg.transform.translation.y,
                 'theta': theta
@@ -381,7 +333,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             pass
 
-    def estimated_pose_correction_callback(self, pose_with_covariance_msg: geometry_msgs.msg.PoseWithCovarianceStamped):
+    def estimated_pose_correction_callback(self, pose_with_covariance_msg):
         if not self.run_started:
             return
 
@@ -390,7 +342,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         covariance_mat = np.array(pose_with_covariance_msg.pose.covariance).reshape(6, 6)
 
         self.estimated_correction_poses_df = self.estimated_correction_poses_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(pose_with_covariance_msg.header.stamp).nanoseconds),
+            't': pose_with_covariance_msg.header.stamp.to_sec(),
             'x': pose_with_covariance_msg.pose.pose.position.x,
             'y': pose_with_covariance_msg.pose.pose.position.y,
             'theta': theta,
@@ -400,7 +352,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             'cov_theta_theta': covariance_mat[5, 5]
         }, ignore_index=True)
 
-    def odom_callback(self, odometry_msg: nav_msgs.msg.Odometry):
+    def odom_callback(self, odometry_msg):
         if not self.run_started:
             return
 
@@ -408,7 +360,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
         self.odom_df = self.odom_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
+            't': odometry_msg.header.stamp.to_sec(),
             'x': odometry_msg.pose.pose.position.x,
             'y': odometry_msg.pose.pose.position.y,
             'theta': theta,
@@ -417,7 +369,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             'v_theta': odometry_msg.twist.twist.angular.z,
         }, ignore_index=True)
 
-    def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
+    def ground_truth_pose_callback(self, odometry_msg):
         if not self.run_started:
             return
 
@@ -425,7 +377,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
         theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
         self.ground_truth_poses_df = self.ground_truth_poses_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
+            't': odometry_msg.header.stamp.to_sec(),
             'x': odometry_msg.pose.pose.position.x,
             'y': odometry_msg.pose.pose.position.y,
             'theta': theta,
@@ -449,7 +401,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
                 del process_copy['memory_maps']
                 del process_copy['environ']
                 process_copy['realtime_stamp'] = time.time()
-                process_copy['rostime_stamp'] = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
+                process_copy['rostime_stamp'] = rospy.Time.now().to_sec()
 
                 processes_dicts_list.append(process_copy)
             except KeyError:
@@ -458,7 +410,7 @@ class LocalPlanningBenchmarkSupervisor(Node):
             with open(ps_snapshot_file_path, 'wb') as ps_snapshot_file:
                 pickle.dump(processes_dicts_list, ps_snapshot_file)
         except TypeError:
-            self.get_logger().error(traceback.format_exc())
+            rospy.logerr(traceback.format_exc())
 
         self.ps_snapshot_count += 1
 
@@ -467,31 +419,18 @@ class LocalPlanningBenchmarkSupervisor(Node):
             with open(self.run_events_file_path, 'w') as run_events_file:
                 run_events_file.write("t, real_time, event\n")
         except IOError as e:
-            self.get_logger().error("slam_benchmark_supervisor.init_event_file: could not write header to run_events_file")
-            self.get_logger().error(e)
+            rospy.logerr("benchmark_supervisor.init_event_file: could not write header to run_events_file")
+            rospy.logerr(e)
 
     def write_event(self, event):
-        ros_time = nanoseconds_to_seconds(self.get_clock().now().nanoseconds)
+        ros_time = rospy.Time.now().to_sec()
         real_time = time.time()
-        event_string = f"t: {ros_time}, real_time: {real_time}, event: {str(event)}"
-        event_csv_line = f"{ros_time}, {real_time}, {str(event)}\n"
-        print_info(event_string, logger=self.get_logger().info)
+        event_string = "t: {ros_time}, real_time: {real_time}, event: {event}".format(ros_time=ros_time, real_time=real_time, event=str(event))
+        event_csv_line = "{ros_time}, {real_time}, {event}\n".format(ros_time=ros_time, real_time=real_time, event=str(event))
+        print_info(event_string, logger=rospy.loginfo)
         try:
             with open(self.run_events_file_path, 'a') as run_events_file:
                 run_events_file.write(event_csv_line)
         except IOError as e:
-            self.get_logger().error(f"write_event: could not write event to run_events_file: {event_string}")
-            self.get_logger().error(e)
-
-    def call_service(self, service_client, request, fail_timeout=30.0, warning_timeout=5.0):
-        time_waited = 0.0
-        while not service_client.wait_for_service(timeout_sec=warning_timeout) and rclpy.ok():
-            self.get_logger().warning(f'supervisor: still waiting {service_client.srv_name} to become available')
-            time_waited += warning_timeout
-            if time_waited >= fail_timeout:
-                self.get_logger().error(f'{service_client.srv_name} was not available')
-                raise RunFailException(f"{service_client.srv_name} was not available")
-
-        srv_future = service_client.call_async(request)
-        rclpy.spin_until_future_complete(self, srv_future)
-        return srv_future.result()
+            rospy.logerr("write_event: could not write event to run_events_file: {event_string}".format(event_string=event_string))
+            rospy.logerr(e)
