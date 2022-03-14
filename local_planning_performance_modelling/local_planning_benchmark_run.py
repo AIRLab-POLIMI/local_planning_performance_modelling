@@ -253,6 +253,8 @@ class BenchmarkRun(object):
                 local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['use_rotate_to_heading'] = False
             else:
                 raise ValueError()
+        elif local_planner_node == 'dwb':
+            pass
         else:
             raise ValueError()
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
