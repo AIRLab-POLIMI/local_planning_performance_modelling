@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <arg name="recorder_output_path" />
+    <arg name="topics" default="-a"/>
+    <arg name="output" default="screen"/>
+
+	<node
+	    name="$(anon recorder)"
+	    pkg="rosbag"
+	    type="record"
+	    args="--lz4 -O $(arg recorder_output_path) $(arg topics)"
+	    output="$(arg output)"/>
+
+</launch>

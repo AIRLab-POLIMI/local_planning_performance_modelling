@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <arg name="configuration"/>
+    <arg name="output" default="screen"/>
+
+    <node
+        name="local_planning_benchmark_supervisor"
+        pkg="local_planning_performance_modelling"
+        type="local_planning_benchmark_supervisor"
+        respawn="false"
+        required="true"
+        output="$(arg output)">
+        <rosparam file="$(arg configuration)"/>
+    </node>
+
+</launch>

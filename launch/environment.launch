@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <arg name="launch_gzclient"/>
+    <arg name="world"/>
+    <arg name="urdf"/>
+    <arg name="launch_rviz"/>
+    <arg name="rviz_config_file"/>
+    <arg name="output" default="screen"/>
+
+    <param name="/use_sim_time" value="true"/>
+
+    <group>
+        <param name="gazebo/enable_ros_network" value="true"/>
+    </group>
+
+    <node
+        name="gzserver"
+        pkg="gazebo_ros"
+        type="gzserver"
+        respawn="false"
+        required="true"
+        args="--verbose -e ode $(arg world_model_file)"
+        output="$(arg output)"/>
+
+    <node
+        name="gzclient"
+        pkg="gazebo_ros"
+        type="gzclient"
+        respawn="false"
+        args="--verbose"
+        if="$(arg launch_gzclient)"
+        output="$(arg output)"/>
+
+    <param
+        name="robot_urdf"
+        textfile="$(arg urdf)"/>
+    <node
+        name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher">
+        <remap from="robot_description" to="robot_urdf"/>
+    </node>
+
+    <node
+        name="rviz"
+        pkg="rviz"
+        type="rviz"
+        args="-d $(arg rviz_config_file)"
+        if="$(arg launch_rviz)"
+        output="log"/>
+
+</launch>
