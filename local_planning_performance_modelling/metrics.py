@@ -341,6 +341,89 @@ class CollisionRate:
         return True
 
 
+class Clearance:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
+        self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
+        self.run_info_path = path.join(run_output_folder, "run_info.yaml")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "clearance"
+        self.version = 1
+
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # check required files exist
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        if not path.isfile(self.scans_file_path):
+            print_error(f"{self.metric_name}: scans_file file not found:\n{self.scans_file_path}")
+            return False
+
+        if not path.isfile(self.local_costmap_params_path):
+            print_error(f"{self.metric_name}: local_costmap_params file not found:\n{self.local_costmap_params_path}")
+            return False
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
+
+        with open(self.local_costmap_params_path) as local_costmap_params_file:
+            local_costmap_params = yaml.safe_load(local_costmap_params_file)
+        footprint_points_list = yaml.safe_load(local_costmap_params['local_costmap']['local_costmap']['ros__parameters']['footprint'])
+        footprint_polygon = shp.Polygon(footprint_points_list)
+
+        # get base_scan offset for this robot
+        with open(self.run_info_path) as run_info_file:
+            run_info = yaml.safe_load(run_info_file)
+        robot_model_name = run_info['run_parameters']['robot_model']
+        if robot_model_name == 'turtlebot3_waffle_performance_modelling':  # TODO avoid hardcoding the offsets here
+            base_scan_x_offset = -0.064
+            base_scan_y_offset = 0.0
+        elif robot_model_name == 'hunter2':
+            base_scan_x_offset = 0.325
+            base_scan_y_offset = 0.115
+        else:
+            print_error(f"{self.metric_name}: robot_model_name not valid:\n{robot_model_name}")
+            return False
+
+        # get events info from run events
+        scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
+
+        clearance_list = list()
+        for i, scan_row in scans_df.iterrows():
+            laser_scan_msg = LaserScan()
+            laser_scan_msg.angle_min = float(scan_row[1])
+            laser_scan_msg.angle_max = float(scan_row[2])
+            laser_scan_msg.angle_increment = float(scan_row[3])
+            laser_scan_msg.range_min = float(scan_row[4])
+            laser_scan_msg.range_max = float(scan_row[5])
+            laser_scan_msg.ranges = list(map(float, scan_row[6:]))
+            pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
+            point_generator = pc2.read_points(pointcloud_msg)
+
+            for point_pc2 in point_generator:
+                if not np.isnan(point_pc2[0]):
+                    point = shp.Point(point_pc2[0] + base_scan_x_offset, point_pc2[1] + base_scan_y_offset)
+                    dist = point.distance(footprint_polygon) if not footprint_polygon.contains(point) else 0.0
+                    clearance_list.append(dist)
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df['minimum_clearance'] = [float(np.min(clearance_list))]
+        self.results_df['average_clearance'] = [float(np.mean(clearance_list))]
+        self.results_df['median_clearance'] = [float(np.median(clearance_list))]
+        self.results_df['maximum_clearance'] = [float(np.max(clearance_list))]
+        return True
+
+
 class CpuTimeAndMaxMemoryUsage:
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
