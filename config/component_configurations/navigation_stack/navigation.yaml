@@ -1,146 +1,98 @@
-bt_navigator:
-  ros__parameters:
-    use_sim_time: True
-    global_frame: map
-    robot_base_frame: base_link
-    odom_topic: /odom
-    enable_groot_monitoring: True
-    groot_zmq_publisher_port: 1666
-    groot_zmq_server_port: 1667
-    default_bt_xml_filename: ""
-    plugin_lib_names:
-    - nav2_compute_path_to_pose_action_bt_node
-    - nav2_follow_path_action_bt_node
-    - nav2_back_up_action_bt_node
-    - nav2_spin_action_bt_node
-    - nav2_wait_action_bt_node
-    - nav2_clear_costmap_service_bt_node
-    - nav2_is_stuck_condition_bt_node
-    - nav2_goal_reached_condition_bt_node
-    - nav2_goal_updated_condition_bt_node
-    - nav2_initial_pose_received_condition_bt_node
-    - nav2_reinitialize_global_localization_service_bt_node
-    - nav2_rate_controller_bt_node
-    - nav2_distance_controller_bt_node
-    - nav2_speed_controller_bt_node
-    - nav2_truncate_path_action_bt_node
-    - nav2_goal_updater_node_bt_node
-    - nav2_recovery_node_bt_node
-    - nav2_pipeline_sequence_bt_node
-    - nav2_round_robin_node_bt_node
-    - nav2_transform_available_condition_bt_node
-    - nav2_time_expired_condition_bt_node
-    - nav2_distance_traveled_condition_bt_node
+recovery_behaviors: [{name: conservative_reset, type: clear_costmap_recovery/ClearCostmapRecovery}, {name: aggressive_reset, type: clear_costmap_recovery/ClearCostmapRecovery}]
+clearing_rotation_allowed: false  # default: true # Determines whether the robot will attempt an in-place rotation when attempting to clear out space. Note: This parameter is only used when the default recovery behaviors are in use, meaning the user has not set the recovery_behaviors parameter to anything custom
+conservative_reset_dist: 3.0  # The distance away from the robot in meters beyond which obstacles will be cleared from the costmap when attempting to clear space in the map. Note, this parameter is only used when the default recovery behaviors are used for move_base.
+recovery_behavior_enabled: true  # Whether to enable the move_base recovery behaviors to attempt to clear out space.
+controller_patience: 15.0  # How long the controller will wait in seconds without receiving a valid control before space-clearing operations are performed.
+planner_patience: 5.0  # How long the planner will wait in seconds in an attempt to find a valid plan before space-clearing operations are performed.
+max_planning_retries: -1  # How many times to allow for planning retries before executing recovery behaviors. A value of -1.0 corresponds to an infinite retries.
 
-bt_navigator_rclcpp_node:
-  ros__parameters:
-    use_sim_time: True
+controller_frequency: 20.0  # The rate in Hz at which to run the control loop and send velocity commands to the base.
+planner_frequency: 0.1  # default: 0.0 # The rate in Hz at which to run the global planning loop. If the frequency is set to 0.0, the global planner will only run when a new goal is received or the local planner reports that its path is blocked.
 
-map_server:
-  ros__parameters:
-    use_sim_time: True
-    yaml_filename: ""
+oscillation_timeout: 0.0  # TODO maybe better to set a reasonable value (10.0) # How long in seconds to allow for oscillation before executing recovery behaviors. A value of 0.0 corresponds to an infinite timeout.
+oscillation_distance: 0.2  # How far in meters the robot must move to be considered not to be oscillating. Moving this far resets the timer counting up to the ~oscillation_timeout
 
-map_saver:
-  ros__parameters:
-    use_sim_time: True
-    save_map_timeout: 5000
-    free_thresh_default: 0.25
-    occupied_thresh_default: 0.65
+shutdown_costmaps: false  # Determines whether to shut down the costmaps of the node when move_base is in an inactive state
 
-recoveries_server:
-  ros__parameters:
-    costmap_topic: local_costmap/costmap_raw
-    footprint_topic: local_costmap/published_footprint
-    cycle_frequency: 10.0
-    recovery_plugins: ["spin", "back_up", "wait"]
-    spin:
-      plugin: "nav2_recoveries/Spin"
-    back_up:
-      plugin: "nav2_recoveries/BackUp"
-    wait:
-      plugin: "nav2_recoveries/Wait"
-    global_frame: odom
-    robot_base_frame: base_link
-    transform_timeout: 0.1
-    use_sim_time: true
-    simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
-    min_rotational_vel: 0.4
-    rotational_acc_lim: 3.2
+local_costmap:  # http://wiki.ros.org/costmap_2d
+  global_frame: odom
+  robot_base_frame: base_footprint
 
-robot_state_publisher:
-  ros__parameters:
-    use_sim_time: True
+  update_frequency: 10.0
+  publish_frequency: 10.0
+  transform_tolerance: 0.5
 
-local_costmap:
-  local_costmap:
-    ros__parameters:
-      use_sim_time: True
-      global_frame: odom
-      plugin_names: ["obstacle_layer", "inflation_layer"]
-      plugin_types: ["nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
-      rolling_window: true
-      width: 6
-      height: 6
-      origin_x: -1.5
-      origin_y: -1.5
-      resolution: 0.05
-      inflation_layer:
-        cost_scaling_factor: 3.0
-      obstacle_layer:
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-      static_layer:
-        map_subscribe_transient_local: True
-      always_send_full_costmap: True
+  static_map: false
+  rolling_window: true
+  width: 6
+  height: 6
+  resolution: 0.05
 
-  local_costmap_client:
-    ros__parameters:
-      use_sim_time: True
+  map_type: costmap
 
-  local_costmap_rclcpp_node:
-    ros__parameters:
-      use_sim_time: True
+  plugins:  # Sequence of plugin specifications, one per layer. Each specification is a dictionary with name and type fields.
+    - {name: static_layer, type: "costmap_2d::StaticLayer"}
+    - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
 
-global_costmap:
-  global_costmap:
-    ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
-      global_frame: map
-      robot_base_frame: base_link
-      use_sim_time: True
-      resolution: 0.05
-      track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
-      always_send_full_costmap: True
-  global_costmap_client:
-    ros__parameters:
-      use_sim_time: True
-  global_costmap_rclcpp_node:
-    ros__parameters:
-      use_sim_time: True
+  static_layer:  # http://wiki.ros.org/costmap_2d/hydro/staticmap#Parameters
+    enabled: true
+    map_topic: /map_gt
+    subscribe_to_updates: false  # default: false  # In addition to map_topic, also subscribe to map_topic + "_updates"
+    track_unknown_space: false  # default: true  # If true, unknown values in the map messages are translated directly to the layer. Otherwise, unknown values in the map message are translated as FREE_SPACE in the layer.
+    unknown_cost_value: -1  # default: -1  # The value for which a cost should be considered unknown when reading in a map from the map server. If the costmap is not tracking unknown space, costs of this value will be considered occupied. A value of zero also results in this parameter being unused.
+
+  obstacle_layer:  # http://wiki.ros.org/costmap_2d/hydro/obstacles
+    enabled: True
+    observation_sources: scan
+    scan:
+      topic: /scan
+      max_obstacle_height: 2.0
+      clearing: True
+      marking: True
+      data_type: "LaserScan"
+
+  inflation_layer:  # http://wiki.ros.org/costmap_2d/hydro/inflation#Parameters
+    enabled: true
+    cost_scaling_factor: 3.0 # set to the same value as ROS2  # default: 10  # A scaling factor to apply to cost values during inflation. The cost function is computed as follows for all cells in the costmap further than the inscribed radius distance and closer than the inflation radius distance away from an actual obstacle: exp(-1.0 * cost_scaling_factor * (distance_from_obstacle - inscribed_radius)) * (costmap_2d::INSCRIBED_INFLATED_OBSTACLE - 1), where costmap_2d::INSCRIBED_INFLATED_OBSTACLE is currently 254. NOTE: since the cost_scaling_factor is multiplied by a negative in the formula, increasing the factor will decrease the resulting cost values.
+    inflation_radius: 0.55 # default: 0.55  # The radius in meters to which the map inflates obstacle cost values.
+
+global_costmap:  # http://wiki.ros.org/costmap_2d
+
+  global_frame: map
+  robot_base_frame: base_footprint
+
+  update_frequency: 1.0
+  publish_frequency: 0.1
+  transform_tolerance: 0.5
+
+  static_map: true
+  rolling_window: false
+  resolution: 0.05
+
+  plugins:  # Sequence of plugin specifications, one per layer. Each specification is a dictionary with name and type fields.
+    - {name: static_layer, type: "costmap_2d::StaticLayer"}
+    - {name: obstacle_layer, type: "costmap_2d::ObstacleLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+
+  static_layer:  # http://wiki.ros.org/costmap_2d/hydro/staticmap#Parameters
+    enabled: true
+    map_topic: /map
+    subscribe_to_updates: false  # default: false  # In addition to map_topic, also subscribe to map_topic + "_updates"
+    track_unknown_space: true  # default: true  # If true, unknown values in the map messages are translated directly to the layer. Otherwise, unknown values in the map message are translated as FREE_SPACE in the layer.
+    unknown_cost_value: -1  # default: -1  # The value for which a cost should be considered unknown when reading in a map from the map server. If the costmap is not tracking unknown space, costs of this value will be considered occupied. A value of zero also results in this parameter being unused.
+
+  obstacle_layer:  # http://wiki.ros.org/costmap_2d/hydro/obstacles
+    enabled: True
+    observation_sources: scan
+    scan:
+      topic: /scan
+      max_obstacle_height: 2.0
+      clearing: True
+      marking: True
+      data_type: "LaserScan"
+
+  inflation_layer:  # http://wiki.ros.org/costmap_2d/hydro/inflation#Parameters
+    enabled: true
+    cost_scaling_factor: 10 # default: 10  # A scaling factor to apply to cost values during inflation. The cost function is computed as follows for all cells in the costmap further than the inscribed radius distance and closer than the inflation radius distance away from an actual obstacle: exp(-1.0 * cost_scaling_factor * (distance_from_obstacle - inscribed_radius)) * (costmap_2d::INSCRIBED_INFLATED_OBSTACLE - 1), where costmap_2d::INSCRIBED_INFLATED_OBSTACLE is currently 254. NOTE: since the cost_scaling_factor is multiplied by a negative in the formula, increasing the factor will decrease the resulting cost values.
+    inflation_radius: 0.55 # default: 0.55  # The radius in meters to which the map inflates obstacle cost values.
