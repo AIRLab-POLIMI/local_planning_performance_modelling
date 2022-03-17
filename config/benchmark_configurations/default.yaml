@@ -20,12 +20,10 @@ environment_type: simulation
 components_configuration:
   supervisor: supervisor/local_planning_benchmark_supervisor.yaml
   amcl: localization/amcl.yaml
-  localization_generator: localization/localization_generator.yaml
   navigation_stack: navigation_stack/navigation.yaml
-  behaviour_tree: navigation_stack/navigate_w_replanning.xml
   rpp: navigation_stack/rpp.yaml
   teb: navigation_stack/teb.yaml
-  dwb: navigation_stack/dwb.yaml
-  navfn: navigation_stack/navfn.yaml
+  dwa: navigation_stack/dwa.yaml
+  global_planner: navigation_stack/global_planner.yaml
   smac: navigation_stack/smac.yaml
-  rviz: rviz/nav2_default_view.rviz
+  rviz: rviz/default_view.rviz
