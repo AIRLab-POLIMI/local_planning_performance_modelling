@@ -1,9 +1,59 @@
-FROM ros:foxy
+FROM ros:melodic
 
 ARG user_uid
 ARG user_name
 ARG user_gid
 ARG user_group
+
+
+# Install dependences
+RUN \
+  apt update && \
+  apt install -y \
+    bash-completion \
+    htop \
+    nano \
+    python-pandas \
+    python3-pandas \
+    python3-shapely \
+    python3-yaml \
+    python-termcolor \
+    python3-termcolor \
+    python-psutil \
+    python3-psutil \
+    python-pip \
+    python3-pip \
+    python-skimage \
+    python3-skimage \
+    python-sklearn \
+    python3-sklearn \
+    python-catkin-tools \
+    ros-melodic-catkin \
+    ros-melodic-gazebo-ros \
+    ros-melodic-gazebo-plugins \
+    ros-melodic-control-toolbox \
+    ros-melodic-controller-manager \
+    ros-melodic-transmission-interface \
+    ros-melodic-joint-limits-interface \
+    ros-melodic-robot-state-publisher \
+    ros-melodic-map-server \
+    ros-melodic-slam-toolbox \
+    ros-melodic-gmapping \
+    ros-melodic-hector-slam \
+    ros-melodic-amcl \
+    ros-melodic-move-base \
+    ros-melodic-global-planner \
+    ros-melodic-dwa-local-planner \
+    ros-melodic-tf-conversions \
+    ros-melodic-tf2-sensor-msgs \
+    liblua5.2 \
+    && apt upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# copy enrtypoint
+COPY ros_entrypoint.sh /ros_entrypoint.sh
+
 
 # switch to user
 RUN \
@@ -13,62 +63,43 @@ RUN adduser $user_name sudo
 RUN echo "$user_name ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 USER $user_name:$user_group
 
-# Install dependences
-RUN \
-  sudo apt update && \
-  sudo apt install -y \
-    bash-completion \
-    htop \
-    nano \
-    python3-pandas \
-    python3-shapely \
-    python3-yaml \
-    python3-termcolor \
-    python3-psutil \
-    python3-pip \
-    python3-skimage \
-    python3-sklearn \
-    python3-colcon-common-extensions \
-    ros-foxy-tf-transformations \
-    ros-foxy-rviz2 \
-    ros-foxy-gazebo-*
 
 # clone repos
-RUN mkdir -p ~/w/ros2_ws/src
+RUN mkdir -p ~/w/catkin_ws/src
 RUN \
-  cd ~/w/ros2_ws/src && \
+  cd ~/w/catkin_ws/src && \
   git clone --branch=master https://github.com/AIRLab-POLIMI/performance_modelling.git && \
-  git clone --branch=foxy-devel https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
-  git clone --branch=foxy https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git && \
-  git clone --branch=ros2 https://github.com/rst-tu-dortmund/costmap_converter.git && \
-  git clone --branch=foxy-devel https://github.com/rst-tu-dortmund/teb_local_planner.git
-
-RUN \
-  rosdep update && \
-  cd ~/w/ros2_ws && \
-  rosdep install --from-paths src --ignore-src -r -y
+  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
+  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git
+# TODO set appropriate performance_modelling tag version
 
 # build workspace and install python user packages
 RUN \
-  . /opt/ros/foxy/setup.sh && \
-  cd ~/w/ros2_ws && \
-  MAKEFLAGS="-j 4" colcon build --parallel-workers 4
+  . /opt/ros/melodic/setup.sh && \
+  cd ~/w/catkin_ws && \
+  catkin build -j 16
 
 RUN \
+  pip install pyquaternion && \
   pip3 install pyquaternion && \
-  pip3 install transforms3d && \
+  pip install networkx && \
   pip3 install networkx && \
+  pip install scikit-image && \
   pip3 install scikit-image
 
 RUN \
-  cd ~/w/ros2_ws/src/performance_modelling/ && \
+  cd ~/w/catkin_ws/src/performance_modelling/ && \
   ./install_dev.sh
 
-RUN mkdir -p ~/ds/performance_modelling
 RUN mkdir -p ~/.ros/log
+RUN mkdir -p ~/ds/performance_modelling
+RUN \
+  cd ~/ds/performance_modelling && \
+  git clone --branch=local-planning-devel https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \
+  ~/w/catkin_ws/src/performance_modelling/performance_modelling_py/environment/decompress_dataset_files.py
 
 # copy bashrc files
 COPY .bashrc /home/$user_name/.bashrc
-RUN sudo chown $user_name:$user_name /home/$user_name/.bashrc
+RUN sudo chown $user_name:$user_group /home/$user_name/.bashrc
 COPY .bash_aliases /home/$user_name/.bash_aliases
-RUN sudo chown $user_name:$user_name /home/$user_name/.bash_aliases
+RUN sudo chown $user_name:$user_group /home/$user_name/.bash_aliases

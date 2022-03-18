@@ -16,7 +16,7 @@ _disable_alias () {
     # We don't know the original no-alias completion for $cmd because it has
     # been overwritten by the alias completion function. What we do here is that
     # we reset all static completions to those in vanilla bash_completion. This
-    # may be an overkill because we only need to reset completion for $cmd, but
+    # may be an overkill becase we only need to reset completion for $cmd, but
     # it works.
     complete -u groups slay w sux
     complete -A stopped -P '"%' -S '"' bg
@@ -98,49 +98,73 @@ _complete_alias () {
     _enable_alias "$cmd"
 }
 
+
 # System utils aliases
+
+alias x='xdg-open'
+
+alias b='byobu'
+
 alias tl='trash-list'
 alias te='trash-empty'
 alias t='trash'
 complete -F _complete_alias t
+
 alias duh='clr; pwd; du -had1 | sort -hr'
+
 alias clr='tput reset' # like clear, but actually clears the terminal, erasing previous output
+
 alias S='source ~/.bashrc'
+
 alias sai='sudo apt install'
 complete -F _complete_alias sai
 
-# Git
 alias s='clr; git s'
 complete -F _complete_alias s
-alias sr='BLUE="\e[34m"; END_COLOR="\e[0m"; clr; for i in `find . -name .git -type d`; do ( cd $i/..; echo ""; echo -e "${BLUE}git fetch and status in `pwd`${END_COLOR}"; git fetch; git status; echo -e "${END_COLOR}" ); done;'
 
-# ROS2
-alias cb='cd $COLCON_WS && colcon build --continue-on-error --symlink-install ; cd -'
+alias push='git push'
+complete -F _complete_alias push
+
+alias cap='pygmentize -g' # replacement of cat with python-pygments to cat with colors
+
+alias ipy='ipython3'
+complete -F _complete_alias ipy
+
+# ROS1 aliases
+
+alias r='rviz'
+
+alias rc='roscore'
+
+alias cb='catkin build -c'
 complete -F _complete_alias cb
 
-alias rt='ros2 topic'
+alias cbt='catkin build --this'
+complete -F _complete_alias cbt
+
+alias rt='rostopic'
 complete -F _complete_alias rt
 
-alias rs='ros2 service'
+alias rs='rosservice'
 complete -F _complete_alias rs
 
-alias ra='ros2 action'
-complete -F _complete_alias ra
-
-alias ri='ros2 interface'
-complete -F _complete_alias ri
-
-alias rn='ros2 node'
+alias rn='rosnode'
 complete -F _complete_alias rn
 
-alias rl='ros2 launch'
+alias rl='roslaunch'
 complete -F _complete_alias rl
 
-alias rr='ros2 run'
+alias rr='rosrun'
 complete -F _complete_alias rr
 
-alias rb='ros2 bag'
+alias rb='rosbag'
 complete -F _complete_alias rb
 
-alias rp='ros2 pkg'
+alias rp='rospkg'
 complete -F _complete_alias rp
+
+alias rcd='roscd'
+complete -F _complete_alias rcd
+
+alias ust='rosparam set use_sim_time true'
+

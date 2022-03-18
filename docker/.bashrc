@@ -40,6 +40,11 @@ case "$TERM" in
     xterm-color|*-256color) color_prompt=yes;;
 esac
 
+# get branch name from git in current directory
+parse_git_branch() {
+     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
+}
+
 # uncomment for a colored prompt, if the terminal has the capability; turned
 # off by default to not distract the user: the focus in a terminal window
 # should be on the output of commands, not on the prompt
@@ -56,13 +61,8 @@ if [ -n "$force_color_prompt" ]; then
     fi
 fi
 
-# get branch name from git in current directory
-parse_git_branch() {
-     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
-}
-
 if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w$(parse_git_branch)\[\033[00m\]\n\$ '
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w$(parse_git_branch)\[\033[00m\] $ '
 else
     PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
 fi
@@ -93,7 +93,7 @@ fi
 #export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 
 # some more ls aliases
-alias ll='ls -alF'
+alias ll='ls -halF'
 alias la='ls -A'
 alias l='ls -CF'
 
@@ -107,6 +107,7 @@ alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo
 # See /usr/share/doc/bash-doc/examples in the bash-doc package.
 
 if [ -f ~/.bash_aliases ]; then
+    echo "source ~/.bash_aliases"
     . ~/.bash_aliases
 fi
 
@@ -121,25 +122,25 @@ if ! shopt -oq posix; then
   fi
 fi
 
+export CATKIN_WS=~/w/catkin_ws
+export ROSCONSOLE_FORMAT='[${severity} ${node}] [${time}]: ${message}'
+
 # Git
 echo "source /usr/share/bash-completion/completions/git"
 source /usr/share/bash-completion/completions/git
 
-# ROS2
-export COLCON_WS=~/w/ros2_ws
-export ROSCONSOLE_FORMAT='[${severity} ${node}] [${time}]: ${message}'
+# ROS1
+echo "source /opt/ros/melodic/setup.bash"
+source /opt/ros/melodic/setup.bash
 
-echo "source /opt/ros/foxy/setup.bash"
-source /opt/ros/foxy/setup.bash
+echo "source ~/w/catkin_ws/devel/setup.bash"
+source ~/w/catkin_ws/devel/setup.bash
 
-echo "source ~/w/ros2_ws/install/setup.bash"
-source ~/w/ros2_ws/install/setup.bash
-
-export TURTLEBOT3_MODEL=waffle
-export GAZEBO_MODEL_PATH=${GAZEBO_MODEL_PATH}:~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models
-export GAZEBO_MODEL_PATH=${GAZEBO_MODEL_PATH}:~/ds/performance_modelling/test_datasets/dataset/
+clear
 
 # change owner of mounted volumes
 sudo chown `id -u`:`id -g` ~/ds/performance_modelling/
+sudo chown `id -u`:`id -g` ~/ds/performance_modelling/output
 sudo chown `id -u`:`id -g` ~/.ros/log/
+
 cd ~

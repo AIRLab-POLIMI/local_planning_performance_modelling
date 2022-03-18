@@ -348,7 +348,7 @@ class BenchmarkRun(object):
         self.log(event=f"run_start")
 
         # declare components
-        roscore = Component('roscore', 'slam_performance_modelling', 'roscore.launch')
+        roscore = Component('roscore', 'local_planning_performance_modelling', 'roscore.launch')
 
         supervisor = Component('supervisor', 'local_planning_performance_modelling', 'local_planning_benchmark_supervisor.launch', {
             'configuration': self.supervisor_configuration_path,
