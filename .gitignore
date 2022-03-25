@@ -6,3 +6,4 @@ local_planning_performance_modelling.egg-info
 notebooks/.ipynb_checkpoints/
 notebooks/**/*.pdf
 notebooks/**/*.png
+*.pyc
