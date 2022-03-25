@@ -278,16 +278,16 @@ class BenchmarkRun(object):
 
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frameName")[0].text = "base_scan"
         if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometrySource")[0].text = "1"  # TODO string instead of int?
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "1"  # TODO string instead of int?
         else:
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/odometrySource")[0].text = "2"  # TODO string instead of int?
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha1")[0].text = str(alpha_1)
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha2")[0].text = str(alpha_2)
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha3")[0].text = str(alpha_3)
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/alpha4")[0].text = str(alpha_4)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "2"  # TODO string instead of int?
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha1".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_1)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha2".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_2)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha3".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_3)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha4".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_4)
 
         if robot_model == 'hunter2':
-            gazebo_robot_model_sdf_root.findall(f".//plugin[@name='{robot_drive_plugin_type}']/maxSteer")[0].text = str(max_steering_rad*1.1)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/maxSteer".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(max_steering_rad*1.1)
         if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
             os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
         gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
@@ -336,16 +336,16 @@ class BenchmarkRun(object):
 
         t = time.time()
 
-        print_info(f"t: {t}, run: {self.run_id}, event: {event}")
+        print_info("t: {t}, run: {run_id}, event: {event}".format(t=t, run_id=self.run_id, event=event))
         try:
             with open(self.benchmark_log_path, 'a') as output_file:
-                output_file.write(f"{t}, {self.run_id}, {event}\n")
+                output_file.write("{t}, {run_id}, {event}\n".format(t=t, run_id=self.run_id, event=event))
         except IOError as e:
-            print_error(f"benchmark_log: could not write event to file: {t}, {self.run_id}, {event}")
+            print_error("benchmark_log: could not write event to file: {t}, {run_id}, {event}".format(t=t, run_id=self.run_id, event=event))
             print_error(e)
 
     def execute_run(self):
-        self.log(event=f"run_start")
+        self.log(event="run_start")
 
         # declare components
         roscore = Component('roscore', 'local_planning_performance_modelling', 'roscore.launch')
@@ -375,7 +375,7 @@ class BenchmarkRun(object):
             'nav_params_file': self.navigation_stack_configuration_path,
             'log_path': self.ros_log_directory,
         })
-        localization = Component('localization', 'local_planning_performance_modelling', f'{self.localization_node}.launch', {
+        localization = Component('localization', 'local_planning_performance_modelling', '{localization_node}.launch'.format(localization_node=self.localization_node), {
             'localization_params_file': self.localization_configuration_path,
             'log_path': self.ros_log_directory,
         })

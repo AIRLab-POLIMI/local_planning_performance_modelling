@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -17,11 +17,11 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description='Execute the benchmark')
 
-    grid_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
+    grid_configurations_dir_path = path.expanduser("~/w/catkin_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
     default_grid_configuration_from_package = "grid_benchmark_all.yaml"
     parser.add_argument('-d', dest='grid_configuration_from_package',
-                        help=f'Yaml file with the combinatorial parameters relative to the config/benchmark_configurations folder in this package. If set, the option "grid_configuration" will be ignored.'
-                             f' Defaults to {default_grid_configuration_from_package}. Available configuration files:\n' +
+                        help='Yaml file with the combinatorial parameters relative to the config/benchmark_configurations folder in this package. If set, the option "grid_configuration" will be ignored.'
+                             ' Defaults to {default_grid_configuration_from_package}. Available configuration files:\n'.format(default_grid_configuration_from_package=default_grid_configuration_from_package) +
                              '\n'.join(sorted(os.listdir(grid_configurations_dir_path))),
                         type=str,
                         default=None,
@@ -29,16 +29,16 @@ def main():
 
     default_grid_configuration = path.join(grid_configurations_dir_path, default_grid_configuration_from_package)
     parser.add_argument('-g', dest='grid_configuration',
-                        help=f'Yaml file with the configuration of the benchmark. This option is ignored if the option grid_configuration_from_package is set. Defaults to {default_grid_configuration}.',
+                        help='Yaml file with the configuration of the benchmark. This option is ignored if the option grid_configuration_from_package is set. Defaults to {default_grid_configuration}.'.format(default_grid_configuration=default_grid_configuration),
                         type=str,
                         default=default_grid_configuration,
                         required=False)
 
-    benchmark_configurations_dir_path = path.expanduser("~/w/ros2_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
+    benchmark_configurations_dir_path = path.expanduser("~/w/catkin_ws/src/local_planning_performance_modelling/config/benchmark_configurations/")
     default_benchmark_configuration_from_package = "default.yaml"
     parser.add_argument('-p', dest='benchmark_configuration_from_package',
-                        help=f'Yaml file with the combinatorial parameters relative to the config/benchmark_configurations folder in this package. If set, the option "benchmark_configuration" will be ignored.'
-                             f' Defaults to {default_benchmark_configuration_from_package}. Available configuration files:\n' +
+                        help='Yaml file with the combinatorial parameters relative to the config/benchmark_configurations folder in this package. If set, the option "benchmark_configuration" will be ignored.'
+                             ' Defaults to {default_benchmark_configuration_from_package}. Available configuration files:\n'.format(default_benchmark_configuration_from_package=default_benchmark_configuration_from_package) +
                              '\n'.join(sorted(os.listdir(benchmark_configurations_dir_path))),
                         type=str,
                         default=None,
@@ -46,21 +46,21 @@ def main():
 
     default_benchmark_configuration = path.join(benchmark_configurations_dir_path, default_benchmark_configuration_from_package)
     parser.add_argument('-c', dest='benchmark_configuration',
-                        help=f'Yaml file with the configuration of the benchmark. This option is ignored if the option benchmark_configuration_from_package is set. Defaults to {default_benchmark_configuration}.',
+                        help='Yaml file with the configuration of the benchmark. This option is ignored if the option benchmark_configuration_from_package is set. Defaults to {default_benchmark_configuration}.'.format(default_benchmark_configuration=default_benchmark_configuration),
                         type=str,
                         default=default_benchmark_configuration,
                         required=False)
 
     default_base_run_folder = "~/ds/performance_modelling/output/test_local_planning/"
     parser.add_argument('-r', dest='base_run_folder',
-                        help=f'Folder in which the result of each run will be placed. Defaults to {default_base_run_folder}',
+                        help='Folder in which the result of each run will be placed. Defaults to {default_base_run_folder}'.format(default_base_run_folder=default_base_run_folder),
                         type=str,
                         default=default_base_run_folder,
                         required=False)
 
     default_num_runs = 1
     parser.add_argument('-n', '--num-runs', dest='num_runs',
-                        help=f'Number of runs to be executed for each combination of configurations. Defaults to {default_num_runs}',
+                        help='Number of runs to be executed for each combination of configurations. Defaults to {default_num_runs}'.format(default_num_runs=default_num_runs),
                         type=int,
                         default=default_num_runs,
                         required=False)
@@ -98,7 +98,7 @@ def main():
     else:
         grid_configuration = path.expanduser(args.grid_configuration)
     if not path.exists(grid_configuration):
-        print_error(f"grid configuration file [{path.abspath(grid_configuration)}] does not exist")
+        print_error("grid configuration file [{grid_configuration_file}] does not exist".format(grid_configuration_file=path.abspath(grid_configuration)))
         sys.exit(-1)
 
     if args.benchmark_configuration_from_package is not None:
@@ -106,7 +106,7 @@ def main():
     else:
         benchmark_configuration = path.expanduser(args.benchmark_configuration)
     if not path.exists(benchmark_configuration):
-        print_error(f"benchmark configuration file [{path.abspath(benchmark_configuration)}] does not exist")
+        print_error("benchmark configuration file [{benchmark_configuration_file}] does not exist".format(benchmark_configuration_file=path.abspath(benchmark_configuration)))
         sys.exit(-1)
 
     grid_executor(benchmark_run_object=BenchmarkRun,
@@ -117,3 +117,6 @@ def main():
                   ignore_executed_params_combinations=args.ignore_previous_runs,
                   shuffle=not args.no_shuffle,
                   args_parser=args)
+
+
+main()
