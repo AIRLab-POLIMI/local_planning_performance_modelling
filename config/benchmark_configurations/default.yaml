@@ -1,10 +1,10 @@
 environments_dataset: ~/ds/performance_modelling/test_datasets/dataset
-robots_dataset: ~/ds/performance_modelling/test_datasets/robots
+robots_dataset: ~/ds/performance_modelling/test_datasets/robots_ros1
 
-source_workspace_path: ~/w/ros2_ws/src/
-components_configurations_folder: ~/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations
-gazebo_model_path_env_var: [~/w/ros2_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
-gazebo_plugin_path_env_var: [~/w/ros2_ws/build/gazebo_plugins/]
+source_workspace_path: ~/w/catkin_ws/src/
+components_configurations_folder: ~/w/catkin_ws/src/local_planning_performance_modelling/config/component_configurations
+gazebo_model_path_env_var: [~/w/catkin_ws/src/turtlebot3_simulations/turtlebot3_gazebo/models/]
+gazebo_plugin_path_env_var: [~/w/catkin_ws/build/gazebo_plugins/]
 
 supervisor_component: local_planning_benchmark_supervisor
 
