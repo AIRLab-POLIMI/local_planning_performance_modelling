@@ -1,5 +1,5 @@
 environments_dataset: ~/ds/performance_modelling/test_datasets/dataset
-robots_dataset: ~/ds/performance_modelling/test_datasets/robots
+robots_dataset: ~/ds/performance_modelling/test_datasets/robots_ros2
 
 source_workspace_path: ~/w/ros2_ws/src/
 components_configurations_folder: ~/w/ros2_ws/src/local_planning_performance_modelling/config/component_configurations
