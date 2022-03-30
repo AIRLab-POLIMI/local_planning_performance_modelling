@@ -20,7 +20,7 @@
         type="gzserver"
         respawn="false"
         required="true"
-        args="--verbose -e ode $(arg world_model_file)"
+        args="--verbose -e ode $(arg world)"
         output="$(arg output)"/>
 
     <node

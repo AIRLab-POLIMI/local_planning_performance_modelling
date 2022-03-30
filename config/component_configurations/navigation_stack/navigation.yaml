@@ -22,13 +22,10 @@ local_costmap:  # http://wiki.ros.org/costmap_2d
   publish_frequency: 10.0
   transform_tolerance: 0.5
 
-  static_map: false
   rolling_window: true
   width: 6
   height: 6
   resolution: 0.05
-
-  map_type: costmap
 
   plugins:  # Sequence of plugin specifications, one per layer. Each specification is a dictionary with name and type fields.
     - {name: static_layer, type: "costmap_2d::StaticLayer"}
@@ -37,7 +34,7 @@ local_costmap:  # http://wiki.ros.org/costmap_2d
 
   static_layer:  # http://wiki.ros.org/costmap_2d/hydro/staticmap#Parameters
     enabled: true
-    map_topic: /map_gt
+    map_topic: /map
     subscribe_to_updates: false  # default: false  # In addition to map_topic, also subscribe to map_topic + "_updates"
     track_unknown_space: false  # default: true  # If true, unknown values in the map messages are translated directly to the layer. Otherwise, unknown values in the map message are translated as FREE_SPACE in the layer.
     unknown_cost_value: -1  # default: -1  # The value for which a cost should be considered unknown when reading in a map from the map server. If the costmap is not tracking unknown space, costs of this value will be considered occupied. A value of zero also results in this parameter being unused.
@@ -66,7 +63,6 @@ global_costmap:  # http://wiki.ros.org/costmap_2d
   publish_frequency: 0.1
   transform_tolerance: 0.5
 
-  static_map: true
   rolling_window: false
   resolution: 0.05
 

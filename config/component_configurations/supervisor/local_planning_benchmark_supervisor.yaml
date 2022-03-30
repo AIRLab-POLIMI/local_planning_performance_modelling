@@ -11,7 +11,7 @@ scan_topic: /scan
 cmd_vel_topic: /cmd_vel
 odom_topic: /odom
 ground_truth_pose_topic: /ground_truth_odom
-goal_pose_topic: /goal_pose
+goal_pose_topic: /supervisor_goal_pose
 navigation_transition_event_topic: /bt_navigator/transition_event
 
 # service names
@@ -23,7 +23,7 @@ unpause_physics_service: /unpause_physics
 set_entity_state_service: /set_entity_state
 
 # action names
-navigate_to_pose_action: /navigate_to_pose
+navigate_to_pose_action: /move_base
 
 # frame names
 fixed_frame: map

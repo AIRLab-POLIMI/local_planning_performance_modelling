@@ -4,7 +4,8 @@
     <arg name="local_planner_params_file"/>
     <arg name="global_planner_params_file"/>
     <arg name="nav_params_file"/>
-    <arg name="output" default="log"/>
+    <arg name="map"/>
+    <arg name="output" default="screen"/>
 
     <node
         name="move_base"

@@ -117,7 +117,6 @@ class BenchmarkRun(object):
         original_supervisor_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['supervisor'])
         original_localization_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][self.localization_node])
         original_navigation_stack_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['navigation_stack'])
-        # original_behaviour_tree_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['behaviour_tree'])
         self.original_rviz_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration']['rviz'])
         original_local_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][local_planner_node])
         original_global_planner_configuration_path = path.join(components_configurations_folder, self.benchmark_configuration['components_configuration'][global_planner_node])
@@ -130,7 +129,6 @@ class BenchmarkRun(object):
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
         localization_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][self.localization_node])
         navigation_stack_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['navigation_stack'])
-        # behaviour_tree_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['behaviour_tree'])
         local_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][local_planner_node])
         global_planner_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration'][global_planner_node])
         gazebo_world_model_relative_path = path.join("components_configuration", "gazebo", "gazebo_environment.model")
@@ -142,7 +140,6 @@ class BenchmarkRun(object):
         self.supervisor_configuration_path = path.join(self.run_output_folder, supervisor_configuration_relative_path)
         self.localization_configuration_path = path.join(self.run_output_folder, localization_configuration_relative_path)
         self.navigation_stack_configuration_path = path.join(self.run_output_folder, navigation_stack_configuration_relative_path)
-        # behaviour_tree_configuration_path = path.join(self.run_output_folder, behaviour_tree_configuration_relative_path)
         self.local_planner_configuration_path = path.join(self.run_output_folder, local_planner_configuration_relative_path)
         self.global_planner_configuration_path = path.join(self.run_output_folder, global_planner_configuration_relative_path)
         self.gazebo_world_model_path = path.join(self.run_output_folder, gazebo_world_model_relative_path)
@@ -196,7 +193,6 @@ class BenchmarkRun(object):
         with open(original_navigation_stack_configuration_path) as navigation_stack_configuration_file:
             navigation_stack_configuration = yaml.safe_load(navigation_stack_configuration_file)
         # navigation_stack_configuration['map_server']['ros__parameters']['yaml_filename'] = self.map_info_file_path
-        # navigation_stack_configuration['bt_navigator']['ros__parameters']['default_bt_xml_filename'] = behaviour_tree_configuration_path
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             navigation_stack_configuration['local_costmap']['footprint'] = turtlebot_footprint_string
             navigation_stack_configuration['global_costmap']['footprint'] = turtlebot_footprint_string
@@ -209,11 +205,6 @@ class BenchmarkRun(object):
             os.makedirs(path.dirname(self.navigation_stack_configuration_path))
         with open(self.navigation_stack_configuration_path, 'w') as navigation_stack_configuration_file:
             yaml.dump(navigation_stack_configuration, navigation_stack_configuration_file, default_flow_style=False)
-
-        # # copy the configuration of the behaviour_tree to the run folder
-        # if not path.exists(path.dirname(behaviour_tree_configuration_path)):
-        #     os.makedirs(path.dirname(behaviour_tree_configuration_path))
-        # shutil.copyfile(original_behaviour_tree_configuration_path, behaviour_tree_configuration_path)
 
         # copy the configuration of global_planner to the run folder and update its parameters
         with open(original_global_planner_configuration_path) as global_planner_configuration_file:
@@ -278,9 +269,9 @@ class BenchmarkRun(object):
 
         gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frameName")[0].text = "base_scan"
         if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "1"  # TODO string instead of int?
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "world"
         else:
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "2"  # TODO string instead of int?
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "parametric_error_model"  # TODO string instead of int?
             gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha1".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_1)
             gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha2".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_2)
             gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha3".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_3)
@@ -315,7 +306,6 @@ class BenchmarkRun(object):
             'navigation_stack': navigation_stack_configuration_relative_path,
             'local_planner_configuration_relative_path': local_planner_configuration_relative_path,
             'global_planner_configuration_relative_path': global_planner_configuration_relative_path,
-            # 'behaviour_tree': behaviour_tree_configuration_relative_path,
             'gazebo_world_model': gazebo_world_model_relative_path,
             'gazebo_robot_model_sdf': gazebo_robot_model_sdf_relative_path,
             'gazebo_robot_model_config': gazebo_robot_model_config_relative_path,
@@ -373,6 +363,7 @@ class BenchmarkRun(object):
             'local_planner_params_file': self.local_planner_configuration_path,
             'global_planner_params_file': self.global_planner_configuration_path,
             'nav_params_file': self.navigation_stack_configuration_path,
+            'map': self.map_info_file_path,
             'log_path': self.ros_log_directory,
         })
         localization = Component('localization', 'local_planning_performance_modelling', '{localization_node}.launch'.format(localization_node=self.localization_node), {
