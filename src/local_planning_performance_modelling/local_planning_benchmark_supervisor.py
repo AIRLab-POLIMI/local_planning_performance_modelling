@@ -63,7 +63,6 @@ def main():
 
 class LocalPlanningBenchmarkSupervisor:
     def __init__(self):
-        super().__init__('local_planning_benchmark_supervisor', automatically_declare_parameters_from_overrides=True)
 
         # Debug variable
         self.prevent_shutdown = False  # Should be False, unless you are currently debugging. if True, runs will never end.
@@ -75,7 +74,7 @@ class LocalPlanningBenchmarkSupervisor:
         ground_truth_pose_topic = rospy.get_param('~ground_truth_pose_topic')
         estimated_pose_correction_topic = rospy.get_param('~estimated_pose_correction_topic')
         goal_pose_topic = rospy.get_param('~goal_pose_topic')
-        navigate_to_pose_action = rospy.get_param('~navigate_to_pose_action')
+        self.navigate_to_pose_action = rospy.get_param('~navigate_to_pose_action')
         self.fixed_frame = rospy.get_param('~fixed_frame')
         self.robot_base_frame = rospy.get_param('~robot_base_frame')
         self.robot_entity_name = rospy.get_param('~robot_entity_name')
@@ -157,7 +156,7 @@ class LocalPlanningBenchmarkSupervisor:
         rospy.Subscriber(ground_truth_pose_topic, Odometry, self.ground_truth_pose_callback, queue_size=1)
 
         # setup action clients
-        self.navigate_to_pose_action_client = SimpleActionClient(navigate_to_pose_action, MoveBaseAction)
+        self.navigate_to_pose_action_client = SimpleActionClient(self.navigate_to_pose_action, MoveBaseAction)
 
     def start_run(self):
         print_info("waiting simulator and navigation stack", logger=rospy.loginfo)
@@ -212,14 +211,16 @@ class LocalPlanningBenchmarkSupervisor:
         self.send_goal()
 
     def send_goal(self):
+        print_info("waiting for navigation action server ({n})".format(n=self.navigate_to_pose_action), logger=rospy.loginfo)
         if not self.navigate_to_pose_action_client.wait_for_server(timeout=rospy.Duration.from_sec(5.0)):
             self.write_event('failed_to_communicate_with_navigation_node')
             raise RunFailException("navigate_to_pose action server not available")
+        print_info("navigation action server active ({n})".format(n=self.navigate_to_pose_action), logger=rospy.loginfo)
 
         goal_msg = MoveBaseGoal()
         goal_msg.target_pose.header.stamp = rospy.Time.now()
         goal_msg.target_pose.header.frame_id = self.fixed_frame
-        goal_msg.target_pose.pose = self.goal_pose
+        goal_msg.target_pose.pose = self.goal_pose.pose
 
         self.navigate_to_pose_action_client.send_goal(goal_msg)
         self.write_event('navigation_goal_sent')
@@ -316,7 +317,7 @@ class LocalPlanningBenchmarkSupervisor:
             'angular_z': twist_msg.angular.z,
         }, ignore_index=True)
 
-    def write_estimated_pose_timer_callback(self):
+    def write_estimated_pose_timer_callback(self, _):
         try:
             transform_msg = self.tf_buffer.lookup_transform(self.fixed_frame, self.robot_base_frame, rospy.Time())
             self.latest_estimated_position = transform_msg.transform.translation  # save the latest position to check if the robot has reached the goal within tolerance
@@ -386,7 +387,7 @@ class LocalPlanningBenchmarkSupervisor:
             'v_theta': odometry_msg.twist.twist.angular.z,
         }, ignore_index=True)
 
-    def ps_snapshot_timer_callback(self):
+    def ps_snapshot_timer_callback(self, _):
         ps_snapshot_file_path = path.join(self.ps_output_folder, "ps_{i:08d}.pkl".format(i=self.ps_snapshot_count))
 
         processes_dicts_list = list()
