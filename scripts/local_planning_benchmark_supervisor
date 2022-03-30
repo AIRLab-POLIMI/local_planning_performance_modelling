@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from local_planning_performance_modelling_ros import local_planning_benchmark_supervisor
+from local_planning_performance_modelling import local_planning_benchmark_supervisor
 
 if __name__ == '__main__':
     local_planning_benchmark_supervisor.main()
