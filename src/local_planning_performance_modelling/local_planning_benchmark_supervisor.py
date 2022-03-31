@@ -212,9 +212,16 @@ class LocalPlanningBenchmarkSupervisor:
 
     def send_goal(self):
         print_info("waiting for navigation action server ({n})".format(n=self.navigate_to_pose_action), logger=rospy.loginfo)
-        if not self.navigate_to_pose_action_client.wait_for_server(timeout=rospy.Duration.from_sec(5.0)):
-            self.write_event('failed_to_communicate_with_navigation_node')
-            raise RunFailException("navigate_to_pose action server not available")
+        action_client_timeout = 25.0
+        action_client_warning_period = 5.0
+        action_client_time_waited = 0.0
+        while not self.navigate_to_pose_action_client.wait_for_server(timeout=rospy.Duration.from_sec(action_client_warning_period)):
+            action_client_time_waited += action_client_warning_period
+            if action_client_time_waited >= action_client_timeout:
+                self.write_event('failed_to_communicate_with_navigation_node')
+                raise RunFailException("navigate_to_pose action server not available")
+            else:
+                rospy.logwarn("still waiting for navigation action server ({n})".format(n=self.navigate_to_pose_action))
         print_info("navigation action server active ({n})".format(n=self.navigate_to_pose_action), logger=rospy.loginfo)
 
         goal_msg = MoveBaseGoal()
