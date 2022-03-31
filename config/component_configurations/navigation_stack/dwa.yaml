@@ -1,30 +1,27 @@
-#max_vel_x: 0.26
-#max_vel_theta: 1.0
-#acc_lim_x: 2.5
-#acc_lim_theta: 3.2
 base_local_planner: dwa_local_planner/DWAPlannerROS
 
 DWAPlannerROS:
 
   max_vel_x: 0.26
-  min_vel_x: 0.0
+  min_vel_x: 0.01
   max_vel_y: 0.0
   min_vel_y: 0.0
   max_vel_theta: 1.0
   min_vel_theta: 0.0
 
   max_vel_trans:  0.26
-  min_vel_trans:  0.0
-  trans_stopped_vel: 0.0
-  theta_stopped_vel: 0.0
+  min_vel_trans:  0.01
+
+  trans_stopped_vel: 0.01
+  theta_stopped_vel: 0.01
 
   acc_lim_x: 2.5
   acc_lim_y: 0.0
   acc_lim_trans: 2.5
   acc_lim_theta: 3.2
 
-  xy_goal_tolerance: 0.1
-  yaw_goal_tolerance: 0.1
+  xy_goal_tolerance: 0.25
+  yaw_goal_tolerance: 0.25
   latch_xy_goal_tolerance: true
 
   sim_time: 1.7  #  The amount of time to roll trajectories out for in seconds
