@@ -1,4 +1,4 @@
-transform_tolerance: 0.1  # ROS2 transform_tolerance: 1.0
+transform_tolerance: 1.0  # ROS2 transform_tolerance: 1.0
 gui_publish_rate: 10.0
 
 global_frame_id: "map"

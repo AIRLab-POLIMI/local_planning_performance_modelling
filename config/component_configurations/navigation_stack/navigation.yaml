@@ -59,7 +59,7 @@ global_costmap:  # http://wiki.ros.org/costmap_2d
   global_frame: map
   robot_base_frame: base_footprint
 
-  update_frequency: 1.0
+  update_frequency: 0.1
   publish_frequency: 0.1
   transform_tolerance: 0.5
 
