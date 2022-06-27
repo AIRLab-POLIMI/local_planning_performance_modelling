@@ -27,7 +27,7 @@ import os
 from os import path
 
 from performance_modelling_py.environment import ground_truth_map
-from performance_modelling_py.utils import print_info, print_error
+from performance_modelling_py.utils import print_info, print_error, print_fatal
 
 
 class RunFailException(Exception):
@@ -75,6 +75,7 @@ class LocalPlanningBenchmarkSupervisor:
         estimated_pose_correction_topic = rospy.get_param('~estimated_pose_correction_topic')
         goal_pose_topic = rospy.get_param('~goal_pose_topic')
         self.navigate_to_pose_action = rospy.get_param('~navigate_to_pose_action')
+        self.navigate_to_pose_topic = rospy.get_param('~navigate_to_pose_topic')
         self.fixed_frame = rospy.get_param('~fixed_frame')
         self.robot_base_frame = rospy.get_param('~robot_base_frame')
         self.robot_entity_name = rospy.get_param('~robot_entity_name')
@@ -99,6 +100,7 @@ class LocalPlanningBenchmarkSupervisor:
         self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
         self.goal_tolerance = rospy.get_param('~goal_tolerance')
         self.goal_obstacle_min_distance = rospy.get_param('~goal_obstacle_min_distance')
+        self.goal_publication_type = rospy.get_param('~goal_publication_type')  
 
         # run variables
         self.run_started = False
@@ -147,6 +149,8 @@ class LocalPlanningBenchmarkSupervisor:
 
         # setup publishers
         self.goal_pose_publisher = rospy.Publisher(goal_pose_topic, PoseStamped, queue_size=1)
+        self.navigate_to_pose_publisher = rospy.Publisher(self.navigate_to_pose_topic, PoseStamped, queue_size=1, latch=True)
+
 
         # setup subscribers
         rospy.Subscriber(scan_topic, LaserScan, self.scan_callback, queue_size=1)
@@ -179,6 +183,10 @@ class LocalPlanningBenchmarkSupervisor:
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
+        print_fatal(voronoi_graph.nodes)
+        for i in voronoi_graph.nodes:
+            print_info(i, voronoi_graph.nodes[i]['vertex'])
+        
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
@@ -208,9 +216,12 @@ class LocalPlanningBenchmarkSupervisor:
 
         self.write_event('run_start')
         self.run_started = True
-        self.send_goal()
+        if self.goal_publication_type == 'action':
+            self.send_action_goal() 
+        else: 
+            self.send_topic_goal()
 
-    def send_goal(self):
+    def send_action_goal(self):
         print_info("waiting for navigation action server ({n})".format(n=self.navigate_to_pose_action), logger=rospy.loginfo)
         action_client_timeout = 25.0
         action_client_warning_period = 5.0
@@ -230,7 +241,7 @@ class LocalPlanningBenchmarkSupervisor:
         goal_msg.target_pose.pose = self.goal_pose.pose
 
         self.navigate_to_pose_action_client.send_goal(goal_msg)
-        self.write_event('navigation_goal_sent')
+        self.write_event('navigation_goal_sent')        # viene usato per capire se la run è partita  
         self.write_event('navigation_goal_accepted')
 
         self.run_data["goal_pose"] = self.goal_pose.pose
@@ -266,6 +277,44 @@ class LocalPlanningBenchmarkSupervisor:
         if not self.prevent_shutdown:
             rospy.signal_shutdown('run completed')
 
+    def send_topic_goal(self):
+        goal_msg = PoseStamped()
+        goal_msg.header.stamp = rospy.Time.now()
+        goal_msg.header.frame_id = self.fixed_frame
+        goal_msg.pose = self.goal_pose.pose
+        
+        self.navigate_to_pose_publisher.publish(goal_msg)
+        self.write_event('navigation_goal_sent')        #viene usato per capire se la run è partita  
+        self.write_event('navigation_goal_accepted')
+
+        self.run_data["goal_pose"] = self.goal_pose.pose
+        self.run_data["voronoi_node_index"] = self.pseudo_random_voronoi_index
+            
+        goal_position = self.goal_pose.pose.position
+        start_time = rospy.Time.now()
+
+        while not rospy.is_shutdown():
+            curren_time = rospy.Time.now()
+            rospy.sleep(0.1)
+            total_waiting_time = curren_time - start_time
+            if total_waiting_time.to_sec() > self.run_timeout:
+                self.write_event('waypoint_timeout')
+                self.write_event('supervisor_finished')
+                raise RunFailException("waypoint_timeout")
+                break   
+            if self.latest_estimated_position is not None:                
+                current_position = self.latest_estimated_position
+                distance_from_goal = np.sqrt((goal_position.x - current_position.x) ** 2 + (goal_position.y - current_position.y) ** 2)
+                if distance_from_goal < self.goal_tolerance:
+                    self.write_event('navigation_succeeded')
+                    self.write_event('navigation_goal_reached')
+                    break
+                else: 
+                    rospy.loginfo("still trying to get to goal position")
+        self.write_event('run_completed')
+        if not self.prevent_shutdown:
+            rospy.signal_shutdown('run completed')
+
     def ros_shutdown_callback(self):
         """
         This function is called when the node receives an interrupt signal (KeyboardInterrupt).
@@ -296,6 +345,7 @@ class LocalPlanningBenchmarkSupervisor:
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
+        #if self.goal_publication_type == 'topic': return
         if not self.run_started:
             return
 
@@ -311,6 +361,7 @@ class LocalPlanningBenchmarkSupervisor:
                 ranges=', '.join(map(str, laser_scan_msg.ranges))))
 
     def cmd_vel_callback(self, twist_msg):
+        #if self.goal_publication_type == 'topic': return
         if not self.run_started:
             return
 
@@ -361,6 +412,7 @@ class LocalPlanningBenchmarkSupervisor:
         }, ignore_index=True)
 
     def odom_callback(self, odometry_msg):
+        #if self.goal_publication_type == 'topic': return
         if not self.run_started:
             return
 
@@ -442,3 +494,4 @@ class LocalPlanningBenchmarkSupervisor:
         except IOError as e:
             rospy.logerr("write_event: could not write event to run_events_file: {event_string}".format(event_string=event_string))
             rospy.logerr(e)
+

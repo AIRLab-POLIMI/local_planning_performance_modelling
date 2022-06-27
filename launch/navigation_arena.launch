@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <arg name="local_planner_params_file"/>
+    <arg name="global_planner_params_file"/>
+    <arg name="nav_params_file"/>
+    <arg name="map"/>
+    <arg name="output" default="screen"/>
+    <!-- <arg name="model" /> -->
+    <param name="bool_goal_reached" value="true" />
+    
+    <node
+        name="move_base"
+        pkg="move_base"
+        type="move_base"
+        respawn="false"
+        required="true"
+        output="$(arg output)">
+        <!-- <rosparam file="$(arg local_planner_params_file)"/>
+        <rosparam file="$(arg global_planner_params_file)"/>
+        <rosparam file="$(arg nav_params_file)"/> -->
+
+	<rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/costmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/costmap_common_params.yaml" command="load" ns="local_costmap" />
+        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/local_costmap_params.yaml" command="load" />
+        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/global_costmap_params.yaml" command="load" />
+    </node>
+
+    <node
+        name="map_server"
+        pkg="map_server"
+        type="map_server"
+        args="$(arg map)"
+        respawn="false"
+        required="true"
+        output="$(arg output)">
+    </node>  
+  
+
+    <!-- spacial_horizon -->
+    <node 
+	name="spacial_horizon_node" 
+	pkg="arena_spacial_horizon"
+	type="spacial_horizon_node"
+  	output="$(arg output)">
+        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/plan_fsm_param.yaml" command="load" /> <!-- ns="fsm"-->
+    </node> 
+
+    <!-- observation_packer -->
+    <node 
+    	name="observation_packer"
+    	pkg="observations" 
+    	type="observation_packer"  
+    	output="$(arg output)">
+    </node>
+
+    <!-- Launch neural net ros wrapper -->
+    <node 
+    	name="arena_node"
+    	pkg="arena_ros" 
+    	type="play_agent.py">
+    </node>
+
+
+    <include file="$(find local_planning_performance_modelling)/launch/intermediate_planner.launch"/>
+    
+</launch>

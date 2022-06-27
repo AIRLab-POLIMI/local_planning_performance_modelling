@@ -13,6 +13,7 @@ odom_topic: /odom
 ground_truth_pose_topic: /base_footprint_gt
 goal_pose_topic: /supervisor_goal_pose
 navigation_transition_event_topic: /bt_navigator/transition_event
+navigate_to_pose_topic: /goal
 
 # service names
 lifecycle_manager_service: /lifecycle_manager/manage_nodes
@@ -31,3 +32,4 @@ robot_base_frame: base_link
 
 # gazebo entity names
 robot_entity_name: robot  # base_footprint
+

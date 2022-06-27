@@ -74,6 +74,9 @@ class BenchmarkRun(object):
             localization_generator_rotation_error = self.run_parameters['localization_generator_rotation_error']
             localization_generator_normalized_relative_translation_error = self.run_parameters['localization_generator_normalized_relative_translation_error']
             localization_generator_normalized_relative_rotation_error = self.run_parameters['localization_generator_normalized_relative_rotation_error']
+        elif self.localization_node == 'ground_truth': 
+            pass
+        
         else:
             raise ValueError()
 
@@ -87,9 +90,12 @@ class BenchmarkRun(object):
         turtlebot_footprint = self.benchmark_configuration['turtlebot_footprint']
         turtlebot_footprint_string = str(turtlebot_footprint)
 
-        max_circumscribing_circle_radius = max(float(np.max(np.fabs(np.array(turtlebot_footprint)))),
-                                               float(np.max(np.fabs(np.array(hunter2_footprint)))))  # largest radius for any robot's circumscribing circle
-        goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
+        #max_circumscribing_circle_radius = max(float(np.max(np.fabs(np.array(turtlebot_footprint)))),
+        #                                       float(np.max(np.fabs(np.array(hunter2_footprint)))))  # largest radius for any robot's circumscribing circle
+        max_circumscribing_circle_radius = float(np.max(np.fabs(np.array(turtlebot_footprint))))        # approx. 0.2
+                                               
+        #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
+        goal_obstacle_min_distance = 0.3  # minimum distance between goals and obstacles
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -97,7 +103,7 @@ class BenchmarkRun(object):
             robot_drive_plugin_type = 'ackermann_drive_plugin'
         else:
             raise ValueError()
-
+            
         # run variables
         self.aborted = False
 
@@ -156,6 +162,7 @@ class BenchmarkRun(object):
         supervisor_configuration['use_sim_time'] = self.use_sim_time
         supervisor_configuration['ground_truth_map_info_path'] = self.map_info_file_path
         supervisor_configuration['goal_obstacle_min_distance'] = goal_obstacle_min_distance
+        supervisor_configuration['goal_publication_type'] = 'action' if local_planner_node in ['dwa', 'teb', 'rpp'] else 'topic' 
         if self.localization_node == 'amcl':
             supervisor_configuration['estimated_pose_correction_topic'] = "/amcl_pose"
         elif self.localization_node == 'localization_generator':
@@ -182,6 +189,9 @@ class BenchmarkRun(object):
             localization_configuration['rotation_error'] = localization_generator_rotation_error
             localization_configuration['normalized_relative_translation_error'] = localization_generator_normalized_relative_translation_error
             localization_configuration['normalized_relative_rotation_error'] = localization_generator_normalized_relative_rotation_error
+        elif self.localization_node == 'ground_truth': 
+            pass
+        
         else:
             raise ValueError()
         if not path.exists(path.dirname(self.localization_configuration_path)):
@@ -336,6 +346,7 @@ class BenchmarkRun(object):
 
     def execute_run(self):
         self.log(event="run_start")
+        local_planner_node = self.run_parameters['local_planner_node']
 
         # declare components
         roscore = Component('roscore', 'local_planning_performance_modelling', 'roscore.launch')
@@ -359,13 +370,25 @@ class BenchmarkRun(object):
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
         })
-        navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch', {
-            'local_planner_params_file': self.local_planner_configuration_path,
-            'global_planner_params_file': self.global_planner_configuration_path,
-            'nav_params_file': self.navigation_stack_configuration_path,
-            'map': self.map_info_file_path,
-            'log_path': self.ros_log_directory,
-        })
+
+        if local_planner_node == 'arena':
+            navigation_arena = Component('navigation_arena', 'local_planning_performance_modelling', 'navigation_arena.launch', {
+                        'local_planner_params_file': self.local_planner_configuration_path,
+                        'global_planner_params_file': self.global_planner_configuration_path,
+                        'nav_params_file': self.navigation_stack_configuration_path,
+                        'map': self.map_info_file_path,
+                        'log_path': self.ros_log_directory,
+            })
+        else:
+            navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch', {
+                        'local_planner_params_file': self.local_planner_configuration_path,
+                        'global_planner_params_file': self.global_planner_configuration_path,
+                        'nav_params_file': self.navigation_stack_configuration_path,
+                        'map': self.map_info_file_path,
+                        'log_path': self.ros_log_directory,
+            })
+    
+        #if self.localization_node == 'ground_truth':
         localization = Component('localization', 'local_planning_performance_modelling', '{localization_node}.launch'.format(localization_node=self.localization_node), {
             'localization_params_file': self.localization_configuration_path,
             'log_path': self.ros_log_directory,
@@ -385,7 +408,10 @@ class BenchmarkRun(object):
             recorder.launch()
         environment.launch()
         localization.launch()
-        navigation.launch()
+        if local_planner_node == 'arena':
+            navigation_arena.launch()
+        else: 
+            navigation.launch()
         supervisor.launch()
 
         # launch components and wait for the supervisor to finish
@@ -400,7 +426,10 @@ class BenchmarkRun(object):
 
         # shut down components
         supervisor.shutdown()
-        navigation.shutdown()
+        if local_planner_node == 'arena':
+            navigation_arena.shutdown()
+        else: 
+            navigation.shutdown()
         localization.shutdown()
         environment.shutdown()
         if not self.do_not_record:
@@ -412,3 +441,4 @@ class BenchmarkRun(object):
             pass
 
         self.log(event="run_end")
+

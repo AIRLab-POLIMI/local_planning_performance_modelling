@@ -39,6 +39,7 @@
         name="robot_state_publisher"
         pkg="robot_state_publisher"
         type="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="50.0" />
         <remap from="robot_description" to="robot_urdf"/>
     </node>
 
