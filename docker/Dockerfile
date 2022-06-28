@@ -8,47 +8,38 @@ ARG user_group
 
 # Install dependences
 RUN \
-  apt update && \
-  apt install -y \
-    bash-completion \
-    htop \
-    nano \
-    python-pandas \
-    python3-pandas \
-    python3-shapely \
-    python3-yaml \
-    python-termcolor \
-    python3-termcolor \
-    python-psutil \
-    python3-psutil \
-    python-pip \
-    python3-pip \
-    python-skimage \
-    python3-skimage \
-    python-sklearn \
-    python3-sklearn \
-    python-catkin-tools \
-    ros-melodic-catkin \
-    ros-melodic-gazebo-ros \
-    ros-melodic-gazebo-plugins \
-    ros-melodic-control-toolbox \
-    ros-melodic-controller-manager \
-    ros-melodic-transmission-interface \
-    ros-melodic-joint-limits-interface \
-    ros-melodic-robot-state-publisher \
-    ros-melodic-map-server \
-    ros-melodic-slam-toolbox \
-    ros-melodic-gmapping \
-    ros-melodic-hector-slam \
-    ros-melodic-amcl \
-    ros-melodic-move-base \
-    ros-melodic-global-planner \
-    ros-melodic-dwa-local-planner \
-    ros-melodic-tf-conversions \
-    ros-melodic-tf2-sensor-msgs \
-    liblua5.2 \
-    && apt upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
+sudo apt install -y  \
+	bash-completion \
+	htop \
+	git-extras \
+	nano \
+	python3-pandas \
+	python3-termcolor \
+	python3-pip \
+	python3-shapely \
+	python3-yaml \
+	python3-skimage \
+	python3-sklearn \
+	python-psutil \
+	python3-psutil \
+	ros-noetic-catkin \
+	ros-noetic-gazebo-ros \
+	ros-noetic-gazebo-plugins \
+	ros-noetic-control-toolbox \
+	ros-noetic-controller-manager \
+	ros-noetic-transmission-interface \
+	ros-noetic-joint-limits-interface \
+	ros-noetic-robot-state-publisher \
+	ros-noetic-map-server \
+	ros-noetic-slam-toolbox \
+	ros-noetic-gmapping \
+	ros-noetic-hector-slam \
+	ros-noetic-amcl \
+	ros-noetic-move-base \
+	ros-noetic-global-planner \
+	ros-noetic-dwa-local-planner \
+	ros-noetic-tf-conversions \
+	ros-noetic-tf2-sensor-msgs 
 
 
 # copy enrtypoint
@@ -69,13 +60,14 @@ RUN mkdir -p ~/w/catkin_ws/src
 RUN \
   cd ~/w/catkin_ws/src && \
   git clone --branch=master https://github.com/AIRLab-POLIMI/performance_modelling.git && \
-  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
-  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git
+  git clone --branch=noetic-devel-temp https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
+  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git 
+# TODO change melodic-devel into noetic-devel for gazebo_ros_pkgs.git
 # TODO set appropriate performance_modelling tag version
 
 # build workspace and install python user packages
 RUN \
-  . /opt/ros/melodic/setup.sh && \
+  . /opt/ros/noetic/setup.sh && \
   cd ~/w/catkin_ws && \
   catkin build -j 16
 
