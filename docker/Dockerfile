@@ -8,7 +8,7 @@ ARG user_group
 
 # Install dependences
 RUN \
-sudo apt install -y  \
+apt install -y  \
 	bash-completion \
 	htop \
 	git-extras \
