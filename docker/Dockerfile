@@ -61,7 +61,7 @@ RUN \
   cd ~/w/catkin_ws/src && \
   git clone --branch=master https://github.com/AIRLab-POLIMI/performance_modelling.git && \
   git clone --branch=noetic-devel-temp https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
-  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git 
+  git clone --branch=noetic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git 
 # TODO change melodic-devel into noetic-devel for gazebo_ros_pkgs.git
 # TODO set appropriate performance_modelling tag version
 
