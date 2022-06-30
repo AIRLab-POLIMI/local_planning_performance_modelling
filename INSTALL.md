@@ -7,7 +7,11 @@ pip install pillow==8.3.2
 ```shell
 pip install numpy==1.19.2 
 ```
-3) 
+3) Install this package so that Python 3.8 is set to default instead of 2.7
+```shell
+sudo apt install python-is-python3
+```
+4) Install packages
 ```shell
 sudo apt install -y  \
 	bash-completion \
@@ -42,12 +46,12 @@ sudo apt install -y  \
 	ros-noetic-tf-conversions \
 	ros-noetic-tf2-sensor-msgs 
 ```
-4) Clone arena-rosnav-3D repo
+5) Clone arena-rosnav-3D repo
 ```shell
 cd ~/w/catkin_ws/src && \
   git clone https://github.com/ignc-research/arena-rosnav-3D.git
 ```
-5) Install packages for arena
+6) Install packages for arena
 ```shell
 sudo apt-get update && sudo apt-get install -y \
 	libopencv-dev \
@@ -68,7 +72,7 @@ sudo apt-get update && sudo apt-get install -y \
 	ros-noetic-lms1xx \
 	ros-noetic-velodyne-description 
 ```
-6) Additional packages from arena
+7) Additional packages from arena
 ```shell		
 pip3 install pyyaml catkin_pkg gym netifaces pathlib filelock pyqt5 mpi4py torch lxml scipy defusedxml
 ```
