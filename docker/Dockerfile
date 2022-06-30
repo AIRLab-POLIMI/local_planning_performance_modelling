@@ -87,7 +87,7 @@ RUN mkdir -p ~/.ros/log
 RUN mkdir -p ~/ds/performance_modelling
 RUN \
   cd ~/ds/performance_modelling && \
-  git clone --branch=local-planning-devel https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \
+  git clone --branch=devel-temp https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \
   ~/w/catkin_ws/src/performance_modelling/performance_modelling_py/environment/decompress_dataset_files.py
 
 # copy bashrc files
