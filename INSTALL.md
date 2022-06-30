@@ -3,8 +3,11 @@
 ```shell
 pip install pillow==8.3.2
 ```
-pip install numpy==1.19.. (non ricordo di preciso la versione, ma si presenterà l’errore a runtime se si usa semplicemente ‘pip install numpy’)
-fai #!/usr/bin/env python in execute_grid_benchmark.py, altrimenti si presenterà l'errore “python node bad interpreter”
+2) Install this numpy version to avoid compatibility conflicts with panda
+```shell
+pip install numpy==1.19.2 
+```
+3) 
 ```shell
 sudo apt install -y  \
 	bash-completion \
@@ -39,7 +42,12 @@ sudo apt install -y  \
 	ros-noetic-tf-conversions \
 	ros-noetic-tf2-sensor-msgs 
 ```
-2) Arena
+4) Clone arena-rosnav-3D repo
+```shell
+cd ~/w/catkin_ws/src && \
+  git clone https://github.com/ignc-research/arena-rosnav-3D.git
+```
+5) Install packages for arena
 ```shell
 sudo apt-get update && sudo apt-get install -y \
 	libopencv-dev \
@@ -60,6 +68,7 @@ sudo apt-get update && sudo apt-get install -y \
 	ros-noetic-lms1xx \
 	ros-noetic-velodyne-description 
 ```
+6) Additional packages from arena
 ```shell		
 pip3 install pyyaml catkin_pkg gym netifaces pathlib filelock pyqt5 mpi4py torch lxml scipy defusedxml
 ```
