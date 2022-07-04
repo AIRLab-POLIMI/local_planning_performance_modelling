@@ -311,6 +311,14 @@ class LocalPlanningBenchmarkSupervisor:
                     break
                 else: 
                     rospy.loginfo("still trying to get to goal position")
+
+
+                    #salvo la posizione del robot. Se si muove controllo tra curr_pos e pos_salvata. se curr_pos - pos_salvata > 10 cm, last_time_robot_movement = now
+                    #                                                                                time_robot = last_time_robot_movement - now()
+                    # se time robot > 20 self.write_event('robot_stuck')
+                    #raise RunFailException('robot_stuck')
+                    #break 
+
         self.write_event('run_completed')
         if not self.prevent_shutdown:
             rospy.signal_shutdown('run completed')
