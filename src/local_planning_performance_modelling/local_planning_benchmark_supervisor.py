@@ -292,11 +292,14 @@ class LocalPlanningBenchmarkSupervisor:
             
         goal_position = self.goal_pose.pose.position
         start_time = rospy.Time.now()
+        current_position = None
+        last_time_robot_movement = None
 
         while not rospy.is_shutdown():
-            curren_time = rospy.Time.now()
+            current_time = rospy.Time.now()
             rospy.sleep(0.1)
-            total_waiting_time = curren_time - start_time
+            total_waiting_time = current_time - start_time
+            latest_position = current_position      # la prima volta è uguale a None
             if total_waiting_time.to_sec() > self.run_timeout:
                 self.write_event('waypoint_timeout')
                 self.write_event('supervisor_finished')
@@ -310,14 +313,29 @@ class LocalPlanningBenchmarkSupervisor:
                     self.write_event('navigation_goal_reached')
                     break
                 else: 
-                    rospy.loginfo("still trying to get to goal position")
+                    rospy.loginfo("attempting to reach goal position")
 
+                if latest_position is not None:
+                    # distance between current position and latest saved position of the robot
+                    latest_distance = np.sqrt((latest_position.x - current_position.x) ** 2 + (latest_position.y - current_position.y) ** 2)
+                    print_error("Distance:")
+                    print_error(latest_distance)
+                    if latest_distance > 0.001: # il robot si sta muovendo
+                        print_error("robot is moving")
+                        last_time_robot_movement = rospy.Time.now() # ultimo istante in cui il robot si è mosso
+                        total_elapsed_time = last_time_robot_movement - current_time
+                        print_error("Time:")
+                        print_error(total_elapsed_time.to_sec()) 
+                       
+                    #TODO mettere le threshold 0.001 e 20 come parametri, fix script
 
+                    #if total_elapsed_time.to_sec > 20
                     #salvo la posizione del robot. Se si muove controllo tra curr_pos e pos_salvata. se curr_pos - pos_salvata > 10 cm, last_time_robot_movement = now
                     #                                                                                time_robot = last_time_robot_movement - now()
                     # se time robot > 20 self.write_event('robot_stuck')
                     #raise RunFailException('robot_stuck')
-                    #break 
+                    #break
+                 
 
         self.write_event('run_completed')
         if not self.prevent_shutdown:
