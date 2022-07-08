@@ -8,6 +8,7 @@
     <arg name="output" default="screen"/>
     <!-- <arg name="model" /> -->
     <param name="bool_goal_reached" value="true" />
+    <param name="real" value="true" />
     
     <node
         name="move_base"
