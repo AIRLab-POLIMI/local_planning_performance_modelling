@@ -277,8 +277,7 @@ class LocalPlanningBenchmarkSupervisor:
         if not self.prevent_shutdown:
             rospy.signal_shutdown('run completed')
 
-    def send_topic_goal(self):
-        #rospy.sleep(10)    
+    def send_topic_goal(self):    
         goal_msg = PoseStamped()
         goal_msg.header.stamp = rospy.Time.now()
         goal_msg.header.frame_id = self.fixed_frame
@@ -318,36 +317,36 @@ class LocalPlanningBenchmarkSupervisor:
                 else: 
                     rospy.loginfo("attempting to reach goal position")
 
-                # if latest_position is not None:
-                #     # distance between current position and latest saved position of the robot
-                #     latest_distance = np.sqrt((latest_position.x - current_position.x) ** 2 + (latest_position.y - current_position.y) ** 2)
-                #     print_error("Latest distance:")
-                #     print_error(latest_distance)
-                #     if latest_distance > 0.01: # il robot si sta muovendo
-                #         time_stuck = 0
-                #         start = current_time
-                #         print_error("robot is moving")
-                #         last_time_robot_movement = rospy.Time.now() # ultimo istante in cui il robot si è mosso
-                #     # else:    # il robot non si sta muovendo
-                #     #     print_error("robot is NOT moving")
-                #     #     last_time_robot_stuck = rospy.Time.now() # ultimo istante in cui il robot è stato rilevato essere fermo
+                """ if latest_position is not None:
+                    # distance between current position and latest saved position of the robot
+                    latest_distance = np.sqrt((latest_position.x - current_position.x) ** 2 + (latest_position.y - current_position.y) ** 2)
+                    print_error("Latest distance:")
+                    print_error(latest_distance)
+                    if latest_distance > 0.01: # il robot si sta muovendo
+                        time_stuck = 0
+                        start = current_time
+                        print_error("robot is moving")
+                        last_time_robot_movement = rospy.Time.now() # ultimo istante in cui il robot si è mosso
+                    # else:    # il robot non si sta muovendo
+                    #     print_error("robot is NOT moving")
+                    #     last_time_robot_stuck = rospy.Time.now() # ultimo istante in cui il robot è stato rilevato essere fermo
                     
-                #     # if last_time_robot_stuck is not None:
-                #     #     time_stuck = last_time_robot_stuck - start
-                #     #     print_error("Time Stuck:")
-                #     #     print_error(time_stuck.to_sec()) 
+                    # if last_time_robot_stuck is not None:
+                    #     time_stuck = last_time_robot_stuck - start
+                    #     print_error("Time Stuck:")
+                    #     print_error(time_stuck.to_sec()) 
 
 
-                #     if last_time_robot_movement is not None:    # questo funziona se il robot si è mosso all'inizio e poi si blocca
-                #         total_elapsed_time = last_time_robot_movement - current_time
-                #         print_error("Time 2:")
-                #         print_error(total_elapsed_time.to_sec()) 
-                #         if total_elapsed_time.to_sec() > 10:    # vel_max = 23 cm/s           50 cm / 23 cm /s = 2 s, per ora settato a 10s, per le run si può mettere a 60s
-                #             self.write_event('robot_stuck')
-                #             raise RunFailException('robot_stuck')
-                #             break
+                    if last_time_robot_movement is not None:    # questo funziona se il robot si è mosso all'inizio e poi si blocca
+                        total_elapsed_time = last_time_robot_movement - current_time
+                        print_error("Time 2:")
+                        print_error(total_elapsed_time.to_sec()) 
+                        if total_elapsed_time.to_sec() > 10:    # vel_max = 23 cm/s           50 cm / 23 cm /s = 2 s, per ora settato a 10s, per le run si può mettere a 60s
+                            self.write_event('robot_stuck')
+                            raise RunFailException('robot_stuck')
+                            break
                        
-                    #TODO mettere le threshold 0.1 e 20 come parametri, fix script
+                    TODO mettere le threshold 0.1 e 20 come parametri, fix script """
                  
 
         self.write_event('run_completed')
