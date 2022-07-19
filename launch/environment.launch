@@ -82,6 +82,13 @@
         <arg name="pose_initial_y" value="8.0"/>
         <arg name="pose_initial_theta" value="0.7"/>
       </include>
+
+      <!--<include file="$(find gazebo_ros)/launch/empty_world.launch">
+             <arg name="world_name" value="$(find pedsim_gazebo_plugin)/worlds/scene.world"/>
+      </include> -->
+         
+         <!-- this node spawn pedsim actors to gazebo once, then the plugin updates their pose -->  
+      <node pkg="pedsim_gazebo_plugin" type="spawn_pedsim_agents.py" name="spawn_pedsim_agents"  output="screen"> </node>
   
       <!-- Visualizer -->
       <node name="pedsim_visualizer" type="pedsim_visualizer_node" pkg="pedsim_visualizer" output="screen">
