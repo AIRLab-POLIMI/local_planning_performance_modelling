@@ -78,9 +78,9 @@
         <arg name="max_robot_speed" value="1.5"/>
         <arg name="robot_mode" value="1"/>
         <arg name="enable_groups" value="true"/>
-        <arg name="pose_initial_x" value="19.2"/>
+        <!--<arg name="pose_initial_x" value="19.2"/>
         <arg name="pose_initial_y" value="8.0"/>
-        <arg name="pose_initial_theta" value="0.7"/>
+        <arg name="pose_initial_theta" value="0.7"/> -->
       </include>
 
       <!--<include file="$(find gazebo_ros)/launch/empty_world.launch">
