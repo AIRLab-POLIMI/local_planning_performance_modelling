@@ -354,15 +354,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
         if not self.run_started:
             return
 
-        self.cmd_vel_df = self.cmd_vel_df.append({
-            't': nanoseconds_to_seconds(self.get_clock().now().nanoseconds),
-            'linear_x': twist_msg.linear.x,
-            'linear_y': twist_msg.linear.y,
-            'linear_z': twist_msg.linear.z,
-            'angular_x': twist_msg.angular.x,
-            'angular_y': twist_msg.angular.y,
-            'angular_z': twist_msg.angular.z,
-        }, ignore_index=True)
+        self.cmd_vel_df = pd.concat([
+            self.cmd_vel_df,
+            pd.DataFrame({
+                't': [nanoseconds_to_seconds(self.get_clock().now().nanoseconds)],
+                'linear_x': [twist_msg.linear.x],
+                'linear_y': [twist_msg.linear.y],
+                'linear_z': [twist_msg.linear.z],
+                'angular_x': [twist_msg.angular.x],
+                'angular_y': [twist_msg.angular.y],
+                'angular_z': [twist_msg.angular.z],
+            })], ignore_index=True)
 
     def write_estimated_pose_timer_callback(self):
         try:
@@ -371,12 +373,14 @@ class LocalPlanningBenchmarkSupervisor(Node):
             orientation = transform_msg.transform.rotation
             theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
-            self.estimated_poses_df = self.estimated_poses_df.append({
-                't': nanoseconds_to_seconds(Time.from_msg(transform_msg.header.stamp).nanoseconds),
-                'x': transform_msg.transform.translation.x,
-                'y': transform_msg.transform.translation.y,
-                'theta': theta
-            }, ignore_index=True)
+            self.estimated_poses_df = pd.concat([
+                self.estimated_poses_df,
+                pd.DataFrame({
+                    't': [nanoseconds_to_seconds(Time.from_msg(transform_msg.header.stamp).nanoseconds)],
+                    'x': [transform_msg.transform.translation.x],
+                    'y': [transform_msg.transform.translation.y],
+                    'theta': [theta],
+                })], ignore_index=True)
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             pass
@@ -389,16 +393,18 @@ class LocalPlanningBenchmarkSupervisor(Node):
         theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
         covariance_mat = np.array(pose_with_covariance_msg.pose.covariance).reshape(6, 6)
 
-        self.estimated_correction_poses_df = self.estimated_correction_poses_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(pose_with_covariance_msg.header.stamp).nanoseconds),
-            'x': pose_with_covariance_msg.pose.pose.position.x,
-            'y': pose_with_covariance_msg.pose.pose.position.y,
-            'theta': theta,
-            'cov_x_x': covariance_mat[0, 0],
-            'cov_x_y': covariance_mat[0, 1],
-            'cov_y_y': covariance_mat[1, 1],
-            'cov_theta_theta': covariance_mat[5, 5]
-        }, ignore_index=True)
+        self.estimated_correction_poses_df = pd.concat([
+            self.estimated_correction_poses_df,
+            pd.DataFrame({
+                't': [nanoseconds_to_seconds(Time.from_msg(pose_with_covariance_msg.header.stamp).nanoseconds)],
+                'x': [pose_with_covariance_msg.pose.pose.position.x],
+                'y': [pose_with_covariance_msg.pose.pose.position.y],
+                'theta': [theta],
+                'cov_x_x': [covariance_mat[0, 0]],
+                'cov_x_y': [covariance_mat[0, 1]],
+                'cov_y_y': [covariance_mat[1, 1]],
+                'cov_theta_theta': [covariance_mat[5, 5]],
+            })], ignore_index=True)
 
     def odom_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         if not self.run_started:
@@ -407,15 +413,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
         orientation = odometry_msg.pose.pose.orientation
         theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
-        self.odom_df = self.odom_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
-            'x': odometry_msg.pose.pose.position.x,
-            'y': odometry_msg.pose.pose.position.y,
-            'theta': theta,
-            'v_x': odometry_msg.twist.twist.linear.x,
-            'v_y': odometry_msg.twist.twist.linear.y,
-            'v_theta': odometry_msg.twist.twist.angular.z,
-        }, ignore_index=True)
+        self.odom_df = pd.concat([
+            self.odom_df,
+            pd.DataFrame({
+                't': [nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds)],
+                'x': [odometry_msg.pose.pose.position.x],
+                'y': [odometry_msg.pose.pose.position.y],
+                'theta': [theta],
+                'v_x': [odometry_msg.twist.twist.linear.x],
+                'v_y': [odometry_msg.twist.twist.linear.y],
+                'v_theta': [odometry_msg.twist.twist.angular.z],
+            })], ignore_index=True)
 
     def ground_truth_pose_callback(self, odometry_msg: nav_msgs.msg.Odometry):
         if not self.run_started:
@@ -424,15 +432,17 @@ class LocalPlanningBenchmarkSupervisor(Node):
         orientation = odometry_msg.pose.pose.orientation
         theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
 
-        self.ground_truth_poses_df = self.ground_truth_poses_df.append({
-            't': nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds),
-            'x': odometry_msg.pose.pose.position.x,
-            'y': odometry_msg.pose.pose.position.y,
-            'theta': theta,
-            'v_x': odometry_msg.twist.twist.linear.x,
-            'v_y': odometry_msg.twist.twist.linear.y,
-            'v_theta': odometry_msg.twist.twist.angular.z,
-        }, ignore_index=True)
+        self.ground_truth_poses_df = pd.concat([
+            self.ground_truth_poses_df,
+            pd.DataFrame({
+                't': [nanoseconds_to_seconds(Time.from_msg(odometry_msg.header.stamp).nanoseconds)],
+                'x': [odometry_msg.pose.pose.position.x],
+                'y': [odometry_msg.pose.pose.position.y],
+                'theta': [theta],
+                'v_x': [odometry_msg.twist.twist.linear.x],
+                'v_y': [odometry_msg.twist.twist.linear.y],
+                'v_theta': [odometry_msg.twist.twist.angular.z],
+            })], ignore_index=True)
 
     def ps_snapshot_timer_callback(self):
         ps_snapshot_file_path = path.join(self.ps_output_folder, "ps_{i:08d}.pkl".format(i=self.ps_snapshot_count))
