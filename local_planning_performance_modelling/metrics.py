@@ -680,10 +680,11 @@ class LocalizationError:
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.errors_plot_file_path = path.join(run_output_folder, "metric_results", "localization_errors.csv")
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "localization_update_error"
-        self.version = 1
+        self.version = 4
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -772,12 +773,17 @@ class LocalizationError:
 
         interpolated_poses = interpolated_df[['t', 'x_est', 'y_est', 'theta_est', 'x_gt', 'y_gt', 'theta_gt']].values
 
+        times = list()
+        trajectory_translations = list()
+        trajectory_rotations = list()
         absolute_translation_errors = list()
         absolute_rotation_errors = list()
         relative_translation_errors = list()
         relative_rotation_errors = list()
         normalized_relative_translation_errors = list()
+        normalized_relative_translation_w_nans_errors = list()
         normalized_relative_rotation_errors = list()
+        normalized_relative_rotation_w_nans_errors = list()
         for i in range(1, len(interpolated_df)):
             start_timestamp = interpolated_poses[i - 1, 0]
             end_timestamp = interpolated_poses[i, 0]
@@ -809,14 +815,39 @@ class LocalizationError:
             rotation_deltas = np.abs(np.arctan2(np.sin(rotation_differences), np.cos(rotation_differences)))  # normalize the angle difference
             trajectory_rotation = np.sum(rotation_deltas)
 
+            times.append(end_timestamp)
             absolute_translation_errors.append(absolute_translation_error)
             absolute_rotation_errors.append(absolute_rotation_error)
+
             relative_translation_errors.append(relative_translation_error)
             relative_rotation_errors.append(relative_rotation_error)
+
+            trajectory_translations.append(trajectory_translation)
+            trajectory_rotations.append(trajectory_rotation)
+
             if trajectory_translation > 0.01:  # only compute this errors if there was a meaningful translation (1cm)
                 normalized_relative_translation_errors.append(relative_translation_error / trajectory_translation)
-            if trajectory_rotation > 0.01:  # only compute this errors if there was a meaningful rotation (0.01rad =~ 0.6deg)
+                normalized_relative_translation_w_nans_errors.append(relative_translation_error / trajectory_translation)
+            else:
+                normalized_relative_translation_w_nans_errors.append(np.nan)
+            if trajectory_rotation > 0.05:  # only compute this errors if there was a meaningful rotation (0.05rad =~ 3deg)
                 normalized_relative_rotation_errors.append(relative_rotation_error/trajectory_rotation)
+                normalized_relative_rotation_w_nans_errors.append(relative_rotation_error/trajectory_rotation)
+            else:
+                normalized_relative_rotation_w_nans_errors.append(np.nan)
+
+        errors_plot_df = pd.DataFrame({
+            't': times,
+            'l': trajectory_translations,
+            'r': trajectory_rotations,
+            'ate': absolute_translation_errors,
+            'are': absolute_rotation_errors,
+            'rte': relative_translation_errors,
+            'rre': relative_rotation_errors,
+            'nrte': normalized_relative_translation_w_nans_errors,
+            'nrre': normalized_relative_rotation_w_nans_errors,
+        })
+        errors_plot_df.to_csv(self.errors_plot_file_path)
 
         self.results_df["localization_update_absolute_translation_error_mean"] = [float(np.mean(absolute_translation_errors)) if len(absolute_translation_errors) else np.nan]
         self.results_df["localization_update_absolute_translation_error_std"] = [float(np.std(absolute_translation_errors)) if len(absolute_translation_errors) else np.nan]
