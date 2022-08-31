@@ -24,14 +24,12 @@ def update_run_parameters(base_run_folder_path):
     run_folders = sorted(list(filter(path.isdir, glob.glob(path.abspath(base_run_folder) + '/*'))))
 
     print_info("update_run_parameters: reading run data")
-    no_output = True
     for i, run_folder in enumerate(run_folders):
         updated_run_info_file_path = path.join(run_folder, "run_info.yaml")
         original_run_info_file_path = path.join(run_folder, "run_info_original.yaml")
 
         if not path.exists(updated_run_info_file_path) and not path.exists(original_run_info_file_path):
             print_error("update_run_parameters: run_info file does not exists [{}]".format(run_folder))
-            no_output = False
             continue
 
         # backup run_info if there is not already a backup of the original
@@ -44,24 +42,30 @@ def update_run_parameters(base_run_folder_path):
 
         if 'run_parameters' not in run_info:
             print_error("update_run_parameters: run_parameters not in run_info [{}]".format(run_folder))
-            no_output = False
             continue
 
         # remove alpha_n parameters
         if 'alpha_1' in run_info['run_parameters']:
+            print_info("removing run_info['run_parameters']['alpha_1']")
             del run_info['run_parameters']['alpha_1']
         if 'alpha_2' in run_info['run_parameters']:
+            print_info("removing run_info['run_parameters']['alpha_2']")
             del run_info['run_parameters']['alpha_2']
         if 'alpha_3' in run_info['run_parameters']:
+            print_info("removing run_info['run_parameters']['alpha_3']")
             del run_info['run_parameters']['alpha_3']
         if 'alpha_4' in run_info['run_parameters']:
+            print_info("removing run_info['run_parameters']['alpha_4']")
             del run_info['run_parameters']['alpha_4']
+
+        if 'fixed_rpp' in run_info['run_parameters'] and run_info['run_parameters']['fixed_rpp'] == True:
+            print_info("removing run_info['run_parameters']['fixed_rpp']")
+            del run_info['run_parameters']['fixed_rpp']
 
         with open(updated_run_info_file_path, 'w') as updated_run_info_file:
             yaml.dump(run_info, updated_run_info_file, default_flow_style=False)
 
-        print_info("update_run_parameters: {}%".format(int((i + 1)*100/len(run_folders))), replace_previous_line=no_output)
-        no_output = True
+        print("update_run_parameters: {}% {}".format(int((i + 1)*100/len(run_folders)), run_folder))
 
 
 def main():
