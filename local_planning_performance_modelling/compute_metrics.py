@@ -117,7 +117,7 @@ def main():
                         required=False)
 
     parser.add_argument('-j', dest='num_parallel_threads',
-                        help='Number of parallel threads. Defaults to {default_num_parallel_threads}.',
+                        help=f'Number of parallel threads. Defaults to {default_num_parallel_threads}.',
                         type=int,
                         default=default_num_parallel_threads,
                         required=False)
