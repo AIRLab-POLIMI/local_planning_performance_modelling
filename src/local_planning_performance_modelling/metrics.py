@@ -10,10 +10,10 @@ from os import path
 import numpy as np
 import pandas as pd
 import yaml
-from sensor_msgs.msg import LaserScan
-import sensor_msgs_py.point_cloud2 as pc2
+from sensor_msgs.msg import LaserScan, PointCloud2
+import sensor_msgs.point_cloud2 as pc2
 
-from local_planning_performance_modelling.laser_geometry import LaserProjection
+from laser_geometry import LaserProjection
 import shapely.geometry as shp
 
 from performance_modelling_py.metrics.localization_metrics import get_matrix_diff
@@ -296,7 +296,7 @@ class CollisionRate:
 
         with open(self.local_costmap_params_path) as local_costmap_params_file:
             local_costmap_params = yaml.safe_load(local_costmap_params_file)
-        footprint_points_list = yaml.safe_load(local_costmap_params['local_costmap']['local_costmap']['ros__parameters']['footprint'])
+        footprint_points_list = yaml.safe_load(local_costmap_params['local_costmap']['footprint'])
         footprint_polygon = shp.Polygon(footprint_points_list)
 
         # get base_scan offset for this robot

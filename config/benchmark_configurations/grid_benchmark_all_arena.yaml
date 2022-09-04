@@ -1,5 +1,6 @@
 #run_index: &id001 [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 run_index: &id001 [15]
+run_replication_index: &id003 [0, 1]
 
 environment_name: &id002 [airlab]
 #environment_name: &id002 [7A-2, airlab, fr079, intel, mexico, office_b]
@@ -13,6 +14,7 @@ combinatorial_parameters: [
     local_planner_node: [arena],
     global_planner_node: [global_planner],
     run_index: *id001,
+    run_replication_index: *id003,
     environment_name: *id002,
   },
   #{
