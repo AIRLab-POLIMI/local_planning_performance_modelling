@@ -332,7 +332,9 @@ class LocalPlanningBenchmarkSupervisor(Node):
         self.get_logger().error("terminating supervisor due to timeout, terminating run")
         self.write_event('run_timeout')
         if not self.prevent_shutdown:
-            self.destroy_node()
+            rclpy.shutdown()
+            self.get_logger().info("called rclpy.shutdown()")
+            # self.destroy_node()
 
     def scan_callback(self, laser_scan_msg):
         self.received_first_scan = True
