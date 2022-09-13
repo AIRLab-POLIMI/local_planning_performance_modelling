@@ -355,7 +355,7 @@ class Clearance:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "clearance"
-        self.version = 1
+        self.version = 2
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -414,11 +414,13 @@ class Clearance:
             pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
             point_generator = pc2.read_points(pointcloud_msg)
 
+            points_clearance_list = list()
             for point_pc2 in point_generator:
                 if not np.isnan(point_pc2[0]):
                     point = shp.Point(point_pc2[0] + base_scan_x_offset, point_pc2[1] + base_scan_y_offset)
                     dist = point.distance(footprint_polygon) if not footprint_polygon.contains(point) else 0.0
-                    clearance_list.append(dist)
+                    points_clearance_list.append(dist)
+            clearance_list.append(np.min(points_clearance_list))
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df['minimum_clearance'] = [float(np.min(clearance_list))]
