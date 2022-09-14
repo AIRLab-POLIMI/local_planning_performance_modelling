@@ -206,6 +206,8 @@ class BenchmarkRun(object):
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             navigation_stack_configuration['local_costmap']['footprint'] = turtlebot_footprint_string
             navigation_stack_configuration['global_costmap']['footprint'] = turtlebot_footprint_string
+            #print(navigation_stack_configuration['local_costmap']['footprint'])
+            #print(navigation_stack_configuration_file)
         elif robot_model == 'hunter2':
             navigation_stack_configuration['local_costmap']['footprint'] = hunter2_footprint_string
             navigation_stack_configuration['global_costmap']['footprint'] = hunter2_footprint_string
@@ -372,6 +374,8 @@ class BenchmarkRun(object):
         })
 
         if local_planner_node == 'arena':
+            #print(self.navigation_stack_configuration_path)
+            #print(self.local_planner_configuration_path)
             navigation_arena = Component('navigation_arena', 'local_planning_performance_modelling', 'navigation_arena.launch', {
                         'local_planner_params_file': self.local_planner_configuration_path,
                         'global_planner_params_file': self.global_planner_configuration_path,

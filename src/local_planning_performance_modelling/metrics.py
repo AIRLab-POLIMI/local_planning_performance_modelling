@@ -404,6 +404,7 @@ class CpuTimeAndMaxMemoryUsage:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
             return False
 
+        print("Cpu time dictionary: " + cpu_time_dict)
         self.results_df["controller_cpu_time"] = [cpu_time_dict["controller_server"]]
         self.results_df["planner_cpu_time"] = [cpu_time_dict["planner_server"]]
         self.results_df["system_cpu_time"] = [sum(cpu_time_dict.values())]

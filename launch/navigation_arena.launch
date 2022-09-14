@@ -17,14 +17,14 @@
         respawn="false"
         required="true"
         output="$(arg output)">
-        <!-- <rosparam file="$(arg local_planner_params_file)"/>
+        <!-- <rosparam file="$(arg local_planner_params_file)"/> -->
         <rosparam file="$(arg global_planner_params_file)"/>
-        <rosparam file="$(arg nav_params_file)"/> -->
+        <rosparam file="$(arg nav_params_file)"/> 
 
-	<rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/costmap_common_params.yaml" command="load" ns="global_costmap" />
+	    <!-- <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/costmap_common_params.yaml" command="load" ns="global_costmap" />
         <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/costmap_common_params.yaml" command="load" ns="local_costmap" />
         <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/local_costmap_params.yaml" command="load" />
-        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/global_costmap_params.yaml" command="load" />
+        <rosparam file="$(find local_planning_performance_modelling)/config/turtlebot3_burger/global_costmap_params.yaml" command="load" /> -->
     </node>
 
     <node
