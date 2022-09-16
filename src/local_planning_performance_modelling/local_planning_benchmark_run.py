@@ -37,6 +37,7 @@ class BenchmarkRun(object):
         robots_dataset_folder = path.expanduser(self.benchmark_configuration['robots_dataset'])
 
         self.environment_folder = path.join(path.expanduser(self.benchmark_configuration['environments_dataset']), self.run_parameters['environment_name'])
+        self.scene_file_path = path.join(self.environment_folder, "data", "scene.xml")
         self.map_info_file_path = path.join(self.environment_folder, "data", "map.yaml")
         self.gazebo_model_path_env_var = ":".join(map(
             lambda p: path.expanduser(p),
@@ -371,6 +372,8 @@ class BenchmarkRun(object):
             'params_file': self.navigation_stack_configuration_path,
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
+            'scene_file': self.scene_file_path,
+            'map_file': self.map_info_file_path,
         })
 
         if local_planner_node == 'arena':

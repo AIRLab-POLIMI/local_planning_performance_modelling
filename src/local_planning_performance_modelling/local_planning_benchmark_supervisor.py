@@ -317,19 +317,19 @@ class LocalPlanningBenchmarkSupervisor:
                 else: 
                     rospy.loginfo("attempting to reach goal position")
 
-                """ if latest_position is not None:
+                if latest_position is not None:
                     # distance between current position and latest saved position of the robot
                     latest_distance = np.sqrt((latest_position.x - current_position.x) ** 2 + (latest_position.y - current_position.y) ** 2)
                     print_error("Latest distance:")
                     print_error(latest_distance)
-                    if latest_distance > 0.01: # il robot si sta muovendo
+                    if latest_distance > 0.009: # il robot si sta muovendo
                         time_stuck = 0
                         start = current_time
                         print_error("robot is moving")
                         last_time_robot_movement = rospy.Time.now() # ultimo istante in cui il robot si è mosso
-                    # else:    # il robot non si sta muovendo
-                    #     print_error("robot is NOT moving")
-                    #     last_time_robot_stuck = rospy.Time.now() # ultimo istante in cui il robot è stato rilevato essere fermo
+                    else:    # il robot non si sta muovendo
+                        print_error("robot is NOT moving")
+                        last_time_robot_stuck = rospy.Time.now() # ultimo istante in cui il robot è stato rilevato essere fermo
                     
                     # if last_time_robot_stuck is not None:
                     #     time_stuck = last_time_robot_stuck - start
@@ -338,7 +338,7 @@ class LocalPlanningBenchmarkSupervisor:
 
 
                     if last_time_robot_movement is not None:    # questo funziona se il robot si è mosso all'inizio e poi si blocca
-                        total_elapsed_time = last_time_robot_movement - current_time
+                        total_elapsed_time = current_time - last_time_robot_movement
                         print_error("Time 2:")
                         print_error(total_elapsed_time.to_sec()) 
                         if total_elapsed_time.to_sec() > 10:    # vel_max = 23 cm/s           50 cm / 23 cm /s = 2 s, per ora settato a 10s, per le run si può mettere a 60s
@@ -346,7 +346,7 @@ class LocalPlanningBenchmarkSupervisor:
                             raise RunFailException('robot_stuck')
                             break
                        
-                    TODO mettere le threshold 0.1 e 20 come parametri, fix script """
+                    #TODO mettere le threshold 0.1 e 20 come parametri 
                  
 
         self.write_event('run_completed')
