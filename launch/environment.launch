@@ -7,7 +7,7 @@
     <arg name="launch_gzclient"/>
     <arg name="rviz_config_file"/>
     <arg name="scene_file"/>
-    <arg name="map_file"/>
+    <!-- <arg name="map_file"/> -->
     <arg name="output" default="screen"/>
     
     <arg name="kbd_teleop" default="false"/>

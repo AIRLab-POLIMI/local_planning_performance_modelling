@@ -373,7 +373,6 @@ class BenchmarkRun(object):
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
             'scene_file': self.scene_file_path,
-            'map_file': self.map_info_file_path,
         })
 
         if local_planner_node == 'arena':

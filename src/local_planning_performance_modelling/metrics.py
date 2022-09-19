@@ -253,7 +253,7 @@ class SuccessRate:
         navigation_goal_reached_events = run_events_df[run_events_df.event == 'navigation_goal_reached']
 
         navigation_goal_reached = len(navigation_goal_reached_events) == 1
-
+        print("ngr: " + str(navigation_goal_reached))
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [int(navigation_goal_reached)]
         return True
@@ -378,7 +378,10 @@ class Clearance:
             return False
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
-        self.results_df[self.metric_name] = [np.nan]
+        self.results_df['minimum_clearance'] = [np.nan]
+        self.results_df['average_clearance'] = [np.nan]
+        self.results_df['median_clearance']  = [np.nan]
+        self.results_df['maximum_clearance'] = [np.nan]
 
         with open(self.local_costmap_params_path) as local_costmap_params_file:
             local_costmap_params = yaml.safe_load(local_costmap_params_file)
