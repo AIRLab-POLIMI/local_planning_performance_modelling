@@ -253,7 +253,7 @@ class SuccessRate:
         navigation_goal_reached_events = run_events_df[run_events_df.event == 'navigation_goal_reached']
 
         navigation_goal_reached = len(navigation_goal_reached_events) == 1
-        print("ngr: " + str(navigation_goal_reached))
+        #print("ngr: " + str(navigation_goal_reached))
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [int(navigation_goal_reached)]
         return True
@@ -507,7 +507,100 @@ class CpuTimeAndMaxMemoryUsage:
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
 
+class Dispersion: 
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
+        self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
+        self.run_info_path = path.join(run_output_folder, "run_info.yaml")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "dispersion"
+        self.version = 1
 
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # check required files exist
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        if not path.isfile(self.scans_file_path):
+            print_error(f"{self.metric_name}: scans_file file not found:\n{self.scans_file_path}")
+            return False
+
+        if not path.isfile(self.local_costmap_params_path):
+            print_error(f"{self.metric_name}: local_costmap_params file not found:\n{self.local_costmap_params_path}")
+            return False
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df['dispersion'] = [np.nan]
+
+        with open(self.local_costmap_params_path) as local_costmap_params_file:
+            local_costmap_params = yaml.safe_load(local_costmap_params_file)
+        footprint_points_list = yaml.safe_load(local_costmap_params['local_costmap']['footprint'])
+        footprint_polygon = shp.Polygon(footprint_points_list)
+
+        # get base_scan offset for this robot
+        with open(self.run_info_path) as run_info_file:
+            run_info = yaml.safe_load(run_info_file)
+        robot_model_name = run_info['run_parameters']['robot_model']
+        if robot_model_name == 'turtlebot3_waffle_performance_modelling':  # TODO avoid hardcoding the offsets here
+            base_scan_x_offset = -0.064
+            base_scan_y_offset = 0.0
+        elif robot_model_name == 'hunter2':
+            base_scan_x_offset = 0.325
+            base_scan_y_offset = 0.115
+        else:
+            print_error(f"{self.metric_name}: robot_model_name not valid:\n{robot_model_name}")
+            return False
+
+        # get events info from run events
+        scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
+
+        local_dispersion_list = list()  # lista in cui aggiungo in ogni cella la dispersione calcolata in un determinato punto del path.
+        for i, scan_row in scans_df.iterrows():
+            laser_scan_msg = LaserScan()
+            laser_scan_msg.angle_min = float(scan_row[1])
+            laser_scan_msg.angle_max = float(scan_row[2])
+            laser_scan_msg.angle_increment = float(scan_row[3])
+            laser_scan_msg.range_min = float(scan_row[4])   # distanza minima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
+            laser_scan_msg.range_max = float(scan_row[5])   # distanza massima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
+            laser_scan_msg.ranges = list(map(float, scan_row[6:]))
+            #print(laser_scan_msg)
+            #print("\nLASER SCAN MSG RANGES: +", laser_scan_msg.ranges)
+            #print(len(laser_scan_msg.ranges)) returns 360
+
+            dispersion = 0
+            i = 0
+            while i < len(laser_scan_msg.ranges)-1:
+                if laser_scan_msg.ranges[i] == float("inf") and laser_scan_msg.ranges[i+1]!= float("inf"): 
+                    dispersion += 1
+                elif laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf"):
+                    dispersion += 1
+                i+=1
+            
+            #print("Dispersion: ", dispersion)
+            local_dispersion_list.append(dispersion) # add to dipersion list each local dispersion
+                
+            #break
+        #print(local_dispersion_list)
+        #print("Length: ", len(local_dispersion_list))
+
+        global_dispersion = sum(local_dispersion_list) / len(local_dispersion_list)
+        print("Global dispersion: ", global_dispersion)
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df['dispersion'] = [float(global_dispersion)]
+        return True
+    
+    
 class OdometryError:
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
