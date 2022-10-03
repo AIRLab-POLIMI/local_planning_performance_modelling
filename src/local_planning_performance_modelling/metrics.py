@@ -567,6 +567,8 @@ class Dispersion:
         # get events info from run events
         scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
 
+        # opzione 1: usa numpy per fare la media dei 360 raggi e ottenere una lista da 16 numpy.mean
+        # opzione 2: scartare valori cambiando angle minx, max e angle increment
         local_dispersion_list = list()  # lista in cui aggiungo in ogni cella la dispersione calcolata in un determinato punto del path.
         for i, scan_row in scans_df.iterrows():
             laser_scan_msg = LaserScan()
@@ -576,11 +578,14 @@ class Dispersion:
             laser_scan_msg.range_min = float(scan_row[4])   # distanza minima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
             laser_scan_msg.range_max = float(scan_row[5])   # distanza massima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
             laser_scan_msg.ranges = list(map(float, scan_row[6:]))
+        #opzione 1: creare gridmap dal laser (matrice con 0 e 1 con numpy)
+        #opzione 2: discretizzare in 16 raggi per evitare errori dovuti al rumore sulla misurazione
 
+        #mentre calcoli la metrica fai un plot dei 16 punti scatter plot plt.scatter (sia dei 360 che dei 16 per confrontare input con output)
             dispersion = 0
             i = 0
             while i < len(laser_scan_msg.ranges)-1:
-                if (laser_scan_msg.ranges[i] == float("inf") and laser_scan_msg.ranges[i+1] != float("inf")) or (laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf")): 
+                if (laser_scan_msg.ranges[i] <= r and laser_scan_msg.ranges[i+1] != float("inf")) or (laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf")): 
                     dispersion += 1
                 i+=1
             
