@@ -482,6 +482,7 @@ class CpuTimeAndMaxMemoryUsage:
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
+                # print(process_name)
                 if process_name not in ['gzserver', 'gzclient', 'rviz2', 'local_planning_']:  # ignore simulator and rviz to count the robot system memory
                     cpu_time_dict[process_name] = max(
                         cpu_time_dict[process_name],
@@ -496,6 +497,7 @@ class CpuTimeAndMaxMemoryUsage:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
             return False
 
+        #print(cpu_time_dict)
         self.results_df["controller_cpu_time"] = [cpu_time_dict["controller_server"]]
         self.results_df["planner_cpu_time"] = [cpu_time_dict["planner_server"]]
         self.results_df["system_cpu_time"] = [sum(cpu_time_dict.values())]
@@ -506,6 +508,7 @@ class CpuTimeAndMaxMemoryUsage:
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
+
 
 class Dispersion: 
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
@@ -573,34 +576,24 @@ class Dispersion:
             laser_scan_msg.range_min = float(scan_row[4])   # distanza minima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
             laser_scan_msg.range_max = float(scan_row[5])   # distanza massima a cui l'ostacolo deve essere per poter essere rilevato dallo scan
             laser_scan_msg.ranges = list(map(float, scan_row[6:]))
-            #print(laser_scan_msg)
-            #print("\nLASER SCAN MSG RANGES: +", laser_scan_msg.ranges)
-            #print(len(laser_scan_msg.ranges)) returns 360
 
             dispersion = 0
             i = 0
             while i < len(laser_scan_msg.ranges)-1:
-                if laser_scan_msg.ranges[i] == float("inf") and laser_scan_msg.ranges[i+1]!= float("inf"): 
-                    dispersion += 1
-                elif laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf"):
+                if (laser_scan_msg.ranges[i] == float("inf") and laser_scan_msg.ranges[i+1] != float("inf")) or (laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf")): 
                     dispersion += 1
                 i+=1
             
-            #print("Dispersion: ", dispersion)
-            local_dispersion_list.append(dispersion) # add to dipersion list each local dispersion
-                
-            #break
-        #print(local_dispersion_list)
-        #print("Length: ", len(local_dispersion_list))
+            local_dispersion_list.append(dispersion) # add to list each local dispersion
 
         global_dispersion = sum(local_dispersion_list) / len(local_dispersion_list)
-        print("Global dispersion: ", global_dispersion)
+        # print("Global dispersion: ", global_dispersion)
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df['dispersion'] = [float(global_dispersion)]
         return True
-    
-    
+
+        
 class OdometryError:
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
         self.results_df = results_df
