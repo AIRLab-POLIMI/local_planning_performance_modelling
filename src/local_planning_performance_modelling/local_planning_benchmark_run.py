@@ -56,6 +56,7 @@ class BenchmarkRun(object):
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
+        pedestrian_number = self.run_parameters['pedestrian_number']
 
         amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = [None]*4
         localization_generator_update_rate = None
@@ -373,6 +374,7 @@ class BenchmarkRun(object):
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
             'scene_file': self.scene_file_path,
+            'pedestrian_number': self.run_parameters['pedestrian_number'],
         })
 
         if local_planner_node == 'arena':

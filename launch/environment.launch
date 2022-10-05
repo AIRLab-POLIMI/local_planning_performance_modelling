@@ -8,6 +8,7 @@
     <arg name="rviz_config_file"/>
     <arg name="scene_file"/>
     <!-- <arg name="map_file"/> -->
+    <arg name="pedestrian_number"/>
     <arg name="output" default="screen"/>
     
     <arg name="kbd_teleop" default="false"/>
@@ -79,6 +80,7 @@
         <arg name="max_robot_speed" value="1.5"/>
         <arg name="robot_mode" value="1"/>
         <arg name="enable_groups" value="true"/>
+        <arg name="pedestrian_number" value="$(arg pedestrian_number)"/>
       </include> 
 
       <!--<include file="$(find gazebo_ros)/launch/empty_world.launch"> 
