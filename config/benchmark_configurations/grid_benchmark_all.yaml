@@ -16,7 +16,7 @@ combinatorial_parameters: [
     run_index: *id001,
     run_replication_index: *id003,
     environment_name: *id002,
-    pedestrian_number: 10,
+    pedestrian_number: [10],
   },
   #{
   #  robot_model: [turtlebot3_waffle_performance_modelling],
