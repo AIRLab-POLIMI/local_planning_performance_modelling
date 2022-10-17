@@ -374,6 +374,7 @@ class BenchmarkRun(object):
             'log_path': self.ros_log_directory,
             'scene_file': self.scene_file_path,
             'pedestrian_number': self.run_parameters['pedestrian_number'],
+            'pedestrian_max_vel':self.run_parameters['pedestrian_max_vel'],
         })
 
         if local_planner_node == 'arena':

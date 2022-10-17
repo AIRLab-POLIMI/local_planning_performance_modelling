@@ -8,6 +8,7 @@
     <arg name="rviz_config_file"/>
     <arg name="scene_file"/>
     <arg name="pedestrian_number"/>
+    <arg name="pedestrian_max_vel"/>
     <arg name="output" default="screen"/>
     
     <arg name="kbd_teleop" default="false"/>
@@ -67,7 +68,7 @@
 
 
   <!-- -->
-      <!-- Simulator  
+      <!-- Simulator  -->
       <include file="$(find pedsim_simulator)/launch/simulator.launch">
         <arg name="kbd_teleop" value="$(arg kbd_teleop)"/>
         <arg name="rqt_teleop" value="$(arg rqt_teleop)"/>
@@ -80,18 +81,19 @@
         <arg name="robot_mode" value="1"/>
         <arg name="enable_groups" value="true"/>
         <arg name="pedestrian_number" value="$(arg pedestrian_number)"/>
-      </include>  -->
+        <arg name="pedestrian_max_vel" value="$(arg pedestrian_max_vel)"/>
+      </include>  
 
       <!--<include file="$(find gazebo_ros)/launch/empty_world.launch"> 
              <arg name="world_name" value="$(find pedsim_gazebo_plugin)/worlds/scene.world"/>
       </include> -->
          
-         <!-- this node spawn pedsim actors to gazebo once, then the plugin updates their pose   
-      <node pkg="pedsim_gazebo_plugin" type="spawn_pedsim_agents.py" name="spawn_pedsim_agents"  output="screen"> </node> -->
+         <!-- this node spawn pedsim actors to gazebo once, then the plugin updates their pose  -->
+      <node pkg="pedsim_gazebo_plugin" type="spawn_pedsim_agents.py" name="spawn_pedsim_agents"  output="screen"> </node> 
   
-      <!-- Visualizer 
+      <!-- Visualizer -->
       <node name="pedsim_visualizer" type="pedsim_visualizer_node" pkg="pedsim_visualizer" output="screen">
         <param name="walls_marker_scale" type="double" value="0.05" />
-      </node> -->
+      </node> 
 
 </launch>

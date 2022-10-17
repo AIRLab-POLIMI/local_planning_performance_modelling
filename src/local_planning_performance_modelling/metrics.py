@@ -584,8 +584,8 @@ class Dispersion:
         #mentre calcoli la metrica fai un plot dei 16 punti scatter plot plt.scatter (sia dei 360 che dei 16 per confrontare input con output)
             dispersion = 0
             i = 0
-            while i < len(laser_scan_msg.ranges)-1:
-                if (laser_scan_msg.ranges[i] <= r and laser_scan_msg.ranges[i+1] != float("inf")) or (laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf")): 
+            while i < len(laser_scan_msg.ranges)-1: #sostituisci == float(inf) con <= r poi
+                if (laser_scan_msg.ranges[i] == float("inf") and laser_scan_msg.ranges[i+1] != float("inf")) or (laser_scan_msg.ranges[i] != float("inf") and laser_scan_msg.ranges[i+1] == float("inf")): 
                     dispersion += 1
                 i+=1
             
