@@ -350,6 +350,7 @@ class BenchmarkRun(object):
     def execute_run(self):
         self.log(event="run_start")
         local_planner_node = self.run_parameters['local_planner_node']
+        pedestrian_number = self.run_parameters['pedestrian_number']
 
         # declare components
         roscore = Component('roscore', 'local_planning_performance_modelling', 'roscore.launch')
@@ -372,14 +373,16 @@ class BenchmarkRun(object):
             'params_file': self.navigation_stack_configuration_path,
             'rviz_config_file': self.original_rviz_configuration_path,
             'log_path': self.ros_log_directory,
+        })
+
+        if pedestrian_number > 0:
+            pedsim = Component('pedsim', 'local_planning_performance_modelling', 'pedsim.launch', {
             'scene_file': self.scene_file_path,
             'pedestrian_number': self.run_parameters['pedestrian_number'],
             'pedestrian_max_vel':self.run_parameters['pedestrian_max_vel'],
-        })
+            })
 
         if local_planner_node == 'arena':
-            #print(self.navigation_stack_configuration_path)
-            #print(self.local_planner_configuration_path)
             navigation_arena = Component('navigation_arena', 'local_planning_performance_modelling', 'navigation_arena.launch', {
                         'local_planner_params_file': self.local_planner_configuration_path,
                         'global_planner_params_file': self.global_planner_configuration_path,
@@ -414,6 +417,8 @@ class BenchmarkRun(object):
         # launch components
         if not self.do_not_record:
             recorder.launch()
+        if pedestrian_number > 0:
+            pedsim.launch()
         environment.launch()
         localization.launch()
         if local_planner_node == 'arena':
@@ -439,6 +444,8 @@ class BenchmarkRun(object):
         else: 
             navigation.shutdown()
         localization.shutdown()
+        if pedestrian_number > 0:
+            pedsim.shutdown()
         environment.shutdown()
         if not self.do_not_record:
             recorder.shutdown()
