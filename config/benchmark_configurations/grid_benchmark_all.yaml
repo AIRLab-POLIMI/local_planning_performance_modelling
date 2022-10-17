@@ -17,7 +17,7 @@ combinatorial_parameters: [
     run_replication_index: *id003,
     environment_name: *id002,
     pedestrian_number: [10],
-    pedestrian_max_vel: [1.5],
+    pedestrian_max_vel: [1.5], # ha senso solo per pedestrian_number > 0
   },
   #{
   #  robot_model: [turtlebot3_waffle_performance_modelling],
