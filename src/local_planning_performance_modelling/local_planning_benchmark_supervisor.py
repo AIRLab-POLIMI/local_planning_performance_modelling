@@ -183,9 +183,9 @@ class LocalPlanningBenchmarkSupervisor:
 
         # get deleaved reduced Voronoi graph from ground truth map
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
-        print_fatal(voronoi_graph.nodes)
-        for i in voronoi_graph.nodes:
-            print_info(i, voronoi_graph.nodes[i]['vertex'])
+        # print_fatal(voronoi_graph.nodes)
+        # for i in voronoi_graph.nodes:
+        #     print_info(i, voronoi_graph.nodes[i]['vertex'])
         
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes

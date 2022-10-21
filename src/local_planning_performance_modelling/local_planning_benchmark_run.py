@@ -9,14 +9,17 @@ import rospy
 import yaml
 
 import xml.etree.ElementTree as et
+from xml.etree.ElementTree import Element
 
 import time
 from os import path
 import numpy as np
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
-from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error
+from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
 from performance_modelling_py.component_proxies.ros1_component import Component
+from performance_modelling_py.environment import ground_truth_map
+
 
 
 class BenchmarkRun(object):
@@ -97,6 +100,9 @@ class BenchmarkRun(object):
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
         goal_obstacle_min_distance = 0.3  # minimum distance between goals and obstacles
+        # in case this value is changed, recompute all waypoints for each map. At the moment there is a standalone script which creates voronoi_graphs
+        # and uses it to generate waypoints with node coordinates. Being the script a standalone and independent from the simulation, we need to pass this values as parameter of a launch file.
+        # Hence, when changing this value, use voronoi.lanuch for each map passing the new goal_obstacle_min_distance as value.
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -327,7 +333,34 @@ class BenchmarkRun(object):
 
         with open(run_info_file_path, 'w') as run_info_file:
             yaml.dump(run_info_dict, run_info_file, default_flow_style=False)
+ 
+        # compute voronoi_graph in order to generate waypoints
+        self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
+        for i in voronoi_graph.nodes:
+            print_info(i, voronoi_graph.nodes[i]['vertex'])
+            
+        # Parse scene.xml
+        scene_xml_tree = et.parse(self.scene_file_path)
+        scene_xml_root = scene_xml_tree.getroot()
 
+        # Remove waypoints already present 
+        for child in scene_xml_root.findall('waypoint'):
+            scene_xml_root.remove(child)
+        
+        # Add waypoints from voronoi graph
+        id = 0
+        for i in voronoi_graph.nodes:
+            x = voronoi_graph.nodes[i]['vertex'][0]
+            y = voronoi_graph.nodes[i]['vertex'][1]
+            id+=1
+            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(id), 'x': str(x), 'y': str(y), 'r': str(1)})
+            scene_xml_root.append(new_waypoint)
+            
+        for child in scene_xml_root:
+            print(child.tag, child.attrib)
+
+        scene_xml_tree.write(self.scene_file_path)
         # log packages and software versions and status
         log_packages_and_repos(source_workspace_path=self.benchmark_configuration['source_workspace_path'], log_dir_path=path.join(self.run_output_folder, "software_versions_log"), use_rospack=False)
 
