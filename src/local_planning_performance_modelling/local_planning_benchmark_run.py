@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+from cmath import inf
 
 import os
 import shutil
 
 import rospy
 import yaml
+import networkx as nx
+import copy
+import random
+from geometry_msgs.msg import Pose, Quaternion, PoseStamped
+import pyquaternion
 
 import xml.etree.ElementTree as et
 from xml.etree.ElementTree import Element
@@ -14,6 +20,7 @@ from xml.etree.ElementTree import Element
 import time
 from os import path
 import numpy as np
+from math import sqrt
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
@@ -337,30 +344,95 @@ class BenchmarkRun(object):
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
-        for i in voronoi_graph.nodes:
+        
+        """ for i in voronoi_graph.nodes:
             print_info(i, voronoi_graph.nodes[i]['vertex'])
-            
-        # Parse scene.xml
+        print("Neighbors:")
+        for i in voronoi_graph.nodes:
+            #print_info(i, voronoi_graph.nodes[i]['vertex'])
+            print_info(i, list(voronoi_graph.neighbors(i)))
+          
+        for each node find the closest one
+        dictionary = {}     # for each node (key) associate the closest one between its neighbors (value)
+        for i in voronoi_graph.nodes:
+            min_euclidean_distance = inf
+            x_i = voronoi_graph.nodes[i]['vertex'][0]
+            y_i = voronoi_graph.nodes[i]['vertex'][1]
+            for j in voronoi_graph.neighbors(i):
+                #print("1")
+                # compute the minimum euclidean distance between i and its neighbors
+                x_j = voronoi_graph.nodes[j]['vertex'][0]
+                y_j = voronoi_graph.nodes[j]['vertex'][1]
+
+                euclidean_distance = sqrt((x_i-x_j)**2 + (y_i-y_j)**2)
+                print(euclidean_distance)
+                if (euclidean_distance <= min_euclidean_distance):
+                    min_euclidean_distance = euclidean_distance
+                    #print(i, j)
+                    dictionary[i] = j
+            #print("2")
+            # add the index of the closest node to the dictionary         
+                   
+            #print("\n")
+        print("Dictionary: ")  
+        print(dictionary) """
+        
+        # parse scene.xml
         scene_xml_tree = et.parse(self.scene_file_path)
         scene_xml_root = scene_xml_tree.getroot()
 
-        # Remove waypoints already present 
+        # remove waypoints already present 
         for child in scene_xml_root.findall('waypoint'):
             scene_xml_root.remove(child)
         
-        # Add waypoints from voronoi graph
+        # add waypoints from voronoi graph
         id = 0
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
             id+=1
-            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(id), 'x': str(x), 'y': str(y), 'r': str(1)})
+            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
             scene_xml_root.append(new_waypoint)
-            
-        for child in scene_xml_root:
-            print(child.tag, child.attrib)
+
+        # for debug    
+        # for child in scene_xml_root:
+        #     if (child.tag != "obstacle"):
+        #         print(child.tag, child.attrib)
 
         scene_xml_tree.write(self.scene_file_path)
+
+         # get the robot position from model.sdf
+        pose_string = gazebo_robot_model_sdf_root[0][0].text
+        pose_string = pose_string.split(' ')
+        robot_pose_x = float(pose_string[0])
+        robot_pose_y = float(pose_string[1])
+        robot_pose_z = float(pose_string[2])
+        #print("Robot pose -> x: " + str(robot_pose_x), "y: " + str(robot_pose_y), "z: " + str(robot_pose_z))
+
+        # find the goal 
+        
+        # in case the graph has multiple unconnected components, remove the components with less than two nodes
+        too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
+
+        for graph_component in too_small_voronoi_graph_components:
+            voronoi_graph.remove_nodes_from(graph_component)
+
+        # select the node pseudo-randomly using the run number
+        # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
+        nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
+        random.Random(0).shuffle(nil)
+        self.pseudo_random_voronoi_index = nil[self.run_index % len(nil)]
+
+        # convert Voronoi node to pose
+        self.goal_pose = PoseStamped()
+        # self.goal_pose.header.stamp = rospy.Time.now()
+        # self.goal_pose.header.frame_id = self.fixed_frame
+        self.goal_pose.pose = Pose()
+        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
+        # q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
+        # self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
+        print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y))
+
         # log packages and software versions and status
         log_packages_and_repos(source_workspace_path=self.benchmark_configuration['source_workspace_path'], log_dir_path=path.join(self.run_output_folder, "software_versions_log"), use_rospack=False)
 

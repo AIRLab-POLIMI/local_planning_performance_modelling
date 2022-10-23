@@ -8,6 +8,8 @@ Panels:
         - /TF1/Frames1
         - /TF1/Tree1
         - /Marker1
+        - /MarkerArray1
+        - /MarkerArray1/Namespaces1
       Splitter Ratio: 0.38842976093292236
     Tree Height: 595
   - Class: rviz/Selection
@@ -422,23 +424,23 @@ Visualization Manager:
       Marker Topic: /pedsim_visualizer/waypoints
       Name: MarkerArray
       Namespaces:
-        waypoint_id_1: true
+        waypoint_id_0: true
         waypoint_id_10: true
-        waypoint_id_11: true
-        waypoint_id_12: true
-        waypoint_id_13: true
-        waypoint_id_14: true
-        waypoint_id_15: true
-        waypoint_id_16: true
-        waypoint_id_17: true
-        waypoint_id_2: true
-        waypoint_id_3: true
-        waypoint_id_4: true
-        waypoint_id_5: true
-        waypoint_id_6: true
-        waypoint_id_7: true
+        waypoint_id_1198: true
+        waypoint_id_1414: true
+        waypoint_id_153: true
+        waypoint_id_199: true
+        waypoint_id_2060: true
+        waypoint_id_235: true
+        waypoint_id_262: true
+        waypoint_id_281: true
+        waypoint_id_348: true
+        waypoint_id_379: true
+        waypoint_id_42: true
+        waypoint_id_43: true
+        waypoint_id_44: true
+        waypoint_id_79: true
         waypoint_id_8: true
-        waypoint_id_9: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -478,7 +480,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 59.653717041015625
+      Scale: 63.81013107299805
       Target Frame: <Fixed Frame>
       X: -0.5478886961936951
       Y: -1.0329771041870117
