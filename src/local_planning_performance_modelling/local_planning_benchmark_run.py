@@ -144,6 +144,7 @@ class BenchmarkRun(object):
         original_gazebo_robot_model_config_path = path.join(robots_dataset_folder, robot_model, "model.config")
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
+        # original_pedsim_config_path = 
 
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
@@ -407,7 +408,7 @@ class BenchmarkRun(object):
         robot_pose_x = float(pose_string[0])
         robot_pose_y = float(pose_string[1])
         robot_pose_z = float(pose_string[2])
-        #print("Robot pose -> x: " + str(robot_pose_x), "y: " + str(robot_pose_y), "z: " + str(robot_pose_z))
+        print("Robot pose -> x: " + str(robot_pose_x), "y: " + str(robot_pose_y), "z: " + str(robot_pose_z))
 
         # find the goal 
         
