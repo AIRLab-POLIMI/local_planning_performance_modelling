@@ -4,7 +4,10 @@ from __future__ import print_function
 from cmath import inf
 
 import os
+from platform import node
 import shutil
+
+from numpy import size
 
 import rospy
 import yaml
@@ -66,6 +69,7 @@ class BenchmarkRun(object):
         max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
         max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
+        pedestrian_number = self.run_parameters['pedestrian_number']
 
         amcl_alpha_1, amcl_alpha_2, amcl_alpha_3, amcl_alpha_4 = [None]*4
         localization_generator_update_rate = None
@@ -387,28 +391,24 @@ class BenchmarkRun(object):
             scene_xml_root.remove(child)
         
         # add waypoints from voronoi graph
-        id = 0
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
-            id+=1
             new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
             scene_xml_root.append(new_waypoint)
 
-        # for debug    
-        # for child in scene_xml_root:
-        #     if (child.tag != "obstacle"):
-        #         print(child.tag, child.attrib)
+        # # for debug    
+        # # for child in scene_xml_root:
+        # #     if (child.tag != "obstacle"):
+        # #         print(child.tag, child.attrib)
 
-        scene_xml_tree.write(self.scene_file_path)
-
-         # get the robot position from model.sdf
-        pose_string = gazebo_robot_model_sdf_root[0][0].text
+        # get the robot position from gazebo_environment.model (starting position is different according to each environment)
+        pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
         pose_string = pose_string.split(' ')
         robot_pose_x = float(pose_string[0])
         robot_pose_y = float(pose_string[1])
         robot_pose_z = float(pose_string[2])
-        print("Robot pose -> x: " + str(robot_pose_x), "y: " + str(robot_pose_y), "z: " + str(robot_pose_z))
+        print("Robot pose -> x:" + str(robot_pose_x), " y:" + str(robot_pose_y), " z:" + str(robot_pose_z))
 
         # find the goal 
         
@@ -426,13 +426,74 @@ class BenchmarkRun(object):
 
         # convert Voronoi node to pose
         self.goal_pose = PoseStamped()
-        # self.goal_pose.header.stamp = rospy.Time.now()
-        # self.goal_pose.header.frame_id = self.fixed_frame
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
         # q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
         # self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
         print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y))
+
+        # given starting robot position and goal position, find the shortest path from goal to start robot pos
+
+        # first find the node id corresponding to the goal position
+        node_id = None
+        for i in voronoi_graph.nodes:
+            x_goal = voronoi_graph.nodes[i]['vertex'][0]
+            y_goal = voronoi_graph.nodes[i]['vertex'][1]
+            if (x_goal == self.goal_pose.pose.position.x and y_goal == self.goal_pose.pose.position.y):
+                node_id = i
+        # then compute id of the nearest node to robot position (do it manually for the moment)
+        start_id = 1191
+
+        # compute shortest path from node_id to start_id
+        shortest_path = nx.dijkstra_path(voronoi_graph, node_id, start_id)
+        print(shortest_path)
+
+        # remove all old agents 
+        for child in scene_xml_root.findall('agent'):
+            scene_xml_root.remove(child)
+        
+        # prepare data for the new agent of type 2 to add in the xml (necessary so that pedestrians avoid the robot) and add it
+        x_agent = 0.0   #these are the default values for agent of type 2 according to pedsim
+        y_agent = 0.0
+        dx = 0.5
+        dy = 0.5
+        n = 1
+        type = 2
+        new_agent = Element('agent', attrib={'x': str(x_agent), 
+                                             'y': str(y_agent), 
+                                             'dx': str(dx), 
+                                             'dy': str(dy), 
+                                             'n': str(n), 
+                                             'type': str(type)})
+        scene_xml_root.append(new_agent) 
+        
+        # now prepare the agents which will follow the shortest path
+        x_agent = x_goal
+        y_agent = y_goal
+        dx = 0.5
+        dy = 0.5
+        n = pedestrian_number
+        type = 10
+        new_agent = Element('agent', attrib={'x': str(x_goal), 
+                                             'y': str(y_goal), 
+                                             'dx': str(dx), 
+                                             'dy': str(dy), 
+                                             'n': str(n), 
+                                             'type': str(type)})
+
+        # add waypoints found in the shortest path as sub-elements of the new agent
+        for i in shortest_path:
+            et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+
+        # for i in reversed(shortest_path):
+        #     #print(i)
+        #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+        
+        scene_xml_root.append(new_agent) 
+
+                 
+        # write to scene.xml TODO change path to that of the run folder
+        scene_xml_tree.write(self.scene_file_path)  
 
         # log packages and software versions and status
         log_packages_and_repos(source_workspace_path=self.benchmark_configuration['source_workspace_path'], log_dir_path=path.join(self.run_output_folder, "software_versions_log"), use_rospack=False)
