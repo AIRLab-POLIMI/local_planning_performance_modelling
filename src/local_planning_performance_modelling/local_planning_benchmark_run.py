@@ -350,38 +350,6 @@ class BenchmarkRun(object):
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
         
-        """ for i in voronoi_graph.nodes:
-            print_info(i, voronoi_graph.nodes[i]['vertex'])
-        print("Neighbors:")
-        for i in voronoi_graph.nodes:
-            #print_info(i, voronoi_graph.nodes[i]['vertex'])
-            print_info(i, list(voronoi_graph.neighbors(i)))
-          
-        for each node find the closest one
-        dictionary = {}     # for each node (key) associate the closest one between its neighbors (value)
-        for i in voronoi_graph.nodes:
-            min_euclidean_distance = inf
-            x_i = voronoi_graph.nodes[i]['vertex'][0]
-            y_i = voronoi_graph.nodes[i]['vertex'][1]
-            for j in voronoi_graph.neighbors(i):
-                #print("1")
-                # compute the minimum euclidean distance between i and its neighbors
-                x_j = voronoi_graph.nodes[j]['vertex'][0]
-                y_j = voronoi_graph.nodes[j]['vertex'][1]
-
-                euclidean_distance = sqrt((x_i-x_j)**2 + (y_i-y_j)**2)
-                print(euclidean_distance)
-                if (euclidean_distance <= min_euclidean_distance):
-                    min_euclidean_distance = euclidean_distance
-                    #print(i, j)
-                    dictionary[i] = j
-            #print("2")
-            # add the index of the closest node to the dictionary         
-                   
-            #print("\n")
-        print("Dictionary: ")  
-        print(dictionary) """
-        
         # parse scene.xml
         scene_xml_tree = et.parse(self.scene_file_path)
         scene_xml_root = scene_xml_tree.getroot()
@@ -396,11 +364,6 @@ class BenchmarkRun(object):
             y = voronoi_graph.nodes[i]['vertex'][1]
             new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
             scene_xml_root.append(new_waypoint)
-
-        # # for debug    
-        # # for child in scene_xml_root:
-        # #     if (child.tag != "obstacle"):
-        # #         print(child.tag, child.attrib)
 
         # get the robot position from gazebo_environment.model (starting position is different according to each environment)
         pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
@@ -428,8 +391,6 @@ class BenchmarkRun(object):
         self.goal_pose = PoseStamped()
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
-        # q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-        # self.goal_pose.pose.orientation = Quaternion(w=q.w, x=q.x, y=q.y, z=q.z)
         print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y))
 
         # given starting robot position and goal position, find the shortest path from goal to start robot pos
@@ -441,7 +402,7 @@ class BenchmarkRun(object):
             y_goal = voronoi_graph.nodes[i]['vertex'][1]
             if (x_goal == self.goal_pose.pose.position.x and y_goal == self.goal_pose.pose.position.y):
                 node_id = i
-        # then compute id of the nearest node to robot position (do it manually for the moment)
+        # then compute id of the nearest node to robot position (do it manually for the moment) TODO
         start_id = 1191
 
         # compute shortest path from node_id to start_id
