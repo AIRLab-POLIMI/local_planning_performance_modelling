@@ -148,7 +148,7 @@ class BenchmarkRun(object):
         original_gazebo_robot_model_config_path = path.join(robots_dataset_folder, robot_model, "model.config")
         original_gazebo_robot_model_sdf_path = path.join(robots_dataset_folder, robot_model, "model.sdf")
         original_robot_urdf_path = path.join(robots_dataset_folder, robot_model, "robot.urdf")
-        # original_pedsim_config_path = 
+        original_pedsim_config_path = self.scene_file_path
 
         # components configuration relative paths
         supervisor_configuration_relative_path = path.join("components_configuration", self.benchmark_configuration['components_configuration']['supervisor'])
@@ -160,6 +160,7 @@ class BenchmarkRun(object):
         gazebo_robot_model_config_relative_path = path.join("components_configuration", "gazebo", "robot", "model.config")
         gazebo_robot_model_sdf_relative_path = path.join("components_configuration", "gazebo", "robot", "model.sdf")
         robot_realistic_urdf_relative_path = path.join("components_configuration", "gazebo", "robot", "robot_realistic.urdf")
+        pedsim_config_relative_path = path.join("components_configuration", "gazebo", "scene.xml")
 
         # components configuration paths in run folder
         self.supervisor_configuration_path = path.join(self.run_output_folder, supervisor_configuration_relative_path)
@@ -171,6 +172,7 @@ class BenchmarkRun(object):
         gazebo_robot_model_config_path = path.join(self.run_output_folder, gazebo_robot_model_config_relative_path)
         gazebo_robot_model_sdf_path = path.join(self.run_output_folder, gazebo_robot_model_sdf_relative_path)
         self.robot_realistic_urdf_path = path.join(self.run_output_folder, robot_realistic_urdf_relative_path)
+        self.pedsim_config_path = path.join(self.run_output_folder, pedsim_config_relative_path)
 
         # copy the configuration of the supervisor to the run folder and update its parameters
         with open(original_supervisor_configuration_path) as supervisor_configuration_file:
@@ -325,45 +327,30 @@ class BenchmarkRun(object):
             os.makedirs(path.dirname(self.robot_realistic_urdf_path))
         robot_realistic_urdf_tree.write(self.robot_realistic_urdf_path)
 
-        # write run info to file
-        run_info_dict = dict()
-        run_info_dict["run_id"] = self.run_id
-        run_info_dict["run_folder"] = self.run_output_folder
-        run_info_dict["environment_folder"] = self.environment_folder
-        run_info_dict["run_parameters"] = self.run_parameters
-        run_info_dict["local_components_configuration"] = {
-            'supervisor': supervisor_configuration_relative_path,
-            'localization': localization_configuration_relative_path,
-            'navigation_stack': navigation_stack_configuration_relative_path,
-            'local_planner_configuration_relative_path': local_planner_configuration_relative_path,
-            'global_planner_configuration_relative_path': global_planner_configuration_relative_path,
-            'gazebo_world_model': gazebo_world_model_relative_path,
-            'gazebo_robot_model_sdf': gazebo_robot_model_sdf_relative_path,
-            'gazebo_robot_model_config': gazebo_robot_model_config_relative_path,
-            'robot_realistic_urdf': robot_realistic_urdf_relative_path,
-        }
+        # copy the configuration of the scene.xml file to the run folder
+        gazebo_original_pedsim_tree = et.parse(original_pedsim_config_path)
+        gazebo_original_pedsim_root = gazebo_original_pedsim_tree.getroot()
+        if not path.exists(path.dirname(self.pedsim_config_path)):
+            os.makedirs(path.dirname(self.pedsim_config_path))
 
-        with open(run_info_file_path, 'w') as run_info_file:
-            yaml.dump(run_info_dict, run_info_file, default_flow_style=False)
- 
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
         
         # parse scene.xml
-        scene_xml_tree = et.parse(self.scene_file_path)
-        scene_xml_root = scene_xml_tree.getroot()
+        # gazebo_original_pedsim_tree = et.parse(self.scene_file_path)
+        # gazebo_original_pedsim_root = gazebo_original_pedsim_tree.getroot()
 
         # remove waypoints already present 
-        for child in scene_xml_root.findall('waypoint'):
-            scene_xml_root.remove(child)
+        # for child in gazebo_original_pedsim_root.findall('waypoint'):
+        #     gazebo_original_pedsim_root.remove(child)
         
         # add waypoints from voronoi graph
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
             new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
-            scene_xml_root.append(new_waypoint)
+            gazebo_original_pedsim_root.append(new_waypoint)
 
         # get the robot position from gazebo_environment.model (starting position is different according to each environment)
         pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
@@ -398,20 +385,23 @@ class BenchmarkRun(object):
         # first find the node id corresponding to the goal position
         node_id = None
         for i in voronoi_graph.nodes:
-            x_goal = voronoi_graph.nodes[i]['vertex'][0]
-            y_goal = voronoi_graph.nodes[i]['vertex'][1]
-            if (x_goal == self.goal_pose.pose.position.x and y_goal == self.goal_pose.pose.position.y):
+            x = voronoi_graph.nodes[i]['vertex'][0]
+            y = voronoi_graph.nodes[i]['vertex'][1]
+            if (x == self.goal_pose.pose.position.x and y == self.goal_pose.pose.position.y):
                 node_id = i
+                x_goal = x
+                y_goal = y
         # then compute id of the nearest node to robot position (do it manually for the moment) TODO
         start_id = 1191
 
         # compute shortest path from node_id to start_id
+        print("Compute shortest path from", node_id, "to", start_id)
         shortest_path = nx.dijkstra_path(voronoi_graph, node_id, start_id)
         print(shortest_path)
 
-        # remove all old agents 
-        for child in scene_xml_root.findall('agent'):
-            scene_xml_root.remove(child)
+        # # remove all old agents 
+        # for child in gazebo_original_pedsim_root.findall('agent'):
+        #     gazebo_original_pedsim_root.remove(child)
         
         # prepare data for the new agent of type 2 to add in the xml (necessary so that pedestrians avoid the robot) and add it
         x_agent = 0.0   #these are the default values for agent of type 2 according to pedsim
@@ -426,17 +416,18 @@ class BenchmarkRun(object):
                                              'dy': str(dy), 
                                              'n': str(n), 
                                              'type': str(type)})
-        scene_xml_root.append(new_agent) 
+        gazebo_original_pedsim_root.append(new_agent) 
         
         # now prepare the agents which will follow the shortest path
         x_agent = x_goal
         y_agent = y_goal
+        print(x_goal, y_goal)
         dx = 0.5
         dy = 0.5
         n = pedestrian_number
         type = 10
-        new_agent = Element('agent', attrib={'x': str(x_goal), 
-                                             'y': str(y_goal), 
+        new_agent = Element('agent', attrib={'x': str(x_agent), 
+                                             'y': str(y_agent), 
                                              'dx': str(dx), 
                                              'dy': str(dy), 
                                              'n': str(n), 
@@ -450,11 +441,33 @@ class BenchmarkRun(object):
         #     #print(i)
         #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
         
-        scene_xml_root.append(new_agent) 
+        gazebo_original_pedsim_root.append(new_agent) 
 
-                 
-        # write to scene.xml TODO change path to that of the run folder
-        scene_xml_tree.write(self.scene_file_path)  
+
+        # write to the file in the run folder  
+        gazebo_original_pedsim_tree.write(self.pedsim_config_path)
+
+        # write run info to file
+        run_info_dict = dict()
+        run_info_dict["run_id"] = self.run_id
+        run_info_dict["run_folder"] = self.run_output_folder
+        run_info_dict["environment_folder"] = self.environment_folder
+        run_info_dict["run_parameters"] = self.run_parameters
+        run_info_dict["local_components_configuration"] = {
+            'supervisor': supervisor_configuration_relative_path,
+            'localization': localization_configuration_relative_path,
+            'navigation_stack': navigation_stack_configuration_relative_path,
+            'local_planner_configuration_relative_path': local_planner_configuration_relative_path,
+            'global_planner_configuration_relative_path': global_planner_configuration_relative_path,
+            'gazebo_world_model': gazebo_world_model_relative_path,
+            'gazebo_robot_model_sdf': gazebo_robot_model_sdf_relative_path,
+            'gazebo_robot_model_config': gazebo_robot_model_config_relative_path,
+            'robot_realistic_urdf': robot_realistic_urdf_relative_path,
+            'pedsim_config': pedsim_config_relative_path,
+        }
+
+        with open(run_info_file_path, 'w') as run_info_file:
+            yaml.dump(run_info_dict, run_info_file, default_flow_style=False)
 
         # log packages and software versions and status
         log_packages_and_repos(source_workspace_path=self.benchmark_configuration['source_workspace_path'], log_dir_path=path.join(self.run_output_folder, "software_versions_log"), use_rospack=False)
@@ -505,7 +518,7 @@ class BenchmarkRun(object):
 
         if pedestrian_number > 0:
             pedsim = Component('pedsim', 'local_planning_performance_modelling', 'pedsim.launch', {
-            'scene_file': self.scene_file_path,
+            'scene_file': self.pedsim_config_path,
             'pedestrian_number': self.run_parameters['pedestrian_number'],
             'pedestrian_max_vel':self.run_parameters['pedestrian_max_vel'],
             })
