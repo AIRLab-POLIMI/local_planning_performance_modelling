@@ -1,5 +1,5 @@
-run_index: &id001 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-#run_index: &id001 [0]
+#run_index: &id001 [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+run_index: &id001 [8, 9, 10, 11, 12, 13, 14, 15, 16]
 run_replication_index: &id003 [0]
 
 environment_name: &id002 [airlab]

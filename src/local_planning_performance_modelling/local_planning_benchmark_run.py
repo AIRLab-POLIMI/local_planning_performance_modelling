@@ -111,9 +111,6 @@ class BenchmarkRun(object):
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
         goal_obstacle_min_distance = 0.3  # minimum distance between goals and obstacles
-        # in case this value is changed, recompute all waypoints for each map. At the moment there is a standalone script which creates voronoi_graphs
-        # and uses it to generate waypoints with node coordinates. Being the script a standalone and independent from the simulation, we need to pass this values as parameter of a launch file.
-        # Hence, when changing this value, use voronoi.lanuch for each map passing the new goal_obstacle_min_distance as value.
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -399,9 +396,13 @@ class BenchmarkRun(object):
                 y_goal = y
     
         # then compute id of the nearest node to robot position (do it manually for the moment) TODO
-        #for i in voronoi_graph.nodes:
-
-        start_id = 1198
+        # minimum_radius = goal_obstacle_min_distance
+        # iterator = filter(lambda n: voronoi_graph.nodes[n]['radius'] <= minimum_radius, voronoi_graph.nodes)
+        # print("List of nodes with radius <= 30 cm: ", list(iterator))
+        for i in voronoi_graph.nodes:
+            print("Radius of node ", i, " = ", voronoi_graph.nodes[i]['radius'])
+        
+        start_id = 1191
         # compute shortest path from node_id to start_id
         print("Compute shortest path from", node_id, "to", start_id)
         shortest_path = nx.dijkstra_path(voronoi_graph, node_id, start_id)
