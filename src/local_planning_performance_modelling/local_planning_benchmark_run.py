@@ -196,6 +196,16 @@ class BenchmarkRun(object):
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
 
+        # get the robot position from gazebo_environment.model (starting position is different according to each environment)
+            gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
+            gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
+            pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
+            pose_string = pose_string.split(' ')
+            robot_initial_pose_x = float(pose_string[0])
+            robot_initial_pose_y = float(pose_string[1])
+            robot_initial_pose_theta = float(pose_string[5])
+            print("Robot initial pose -> x: " + str(robot_initial_pose_x), " y: " + str(robot_initial_pose_y), " theta(radians): " + str(robot_initial_pose_theta))
+
         # copy the configuration of the localization to the run folder and update its parameters
         with open(original_localization_configuration_path) as localization_configuration_file:
             localization_configuration = yaml.safe_load(localization_configuration_file)
@@ -204,6 +214,9 @@ class BenchmarkRun(object):
             localization_configuration['alpha2'] = amcl_alpha_2
             localization_configuration['alpha3'] = amcl_alpha_3
             localization_configuration['alpha4'] = amcl_alpha_4
+            localization_configuration['initial_pose_x'] = robot_initial_pose_x
+            localization_configuration['initial_pose_y'] = robot_initial_pose_y
+            localization_configuration['initial_pose_a'] = robot_initial_pose_theta
         elif self.localization_node == 'localization_generator':
             localization_configuration['update_pose_rate'] = localization_generator_update_rate
             localization_configuration['translation_error'] = localization_generator_translation_error
@@ -352,14 +365,6 @@ class BenchmarkRun(object):
             new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
             gazebo_original_pedsim_root.append(new_waypoint)
 
-        # get the robot position from gazebo_environment.model (starting position is different according to each environment)
-        pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
-        pose_string = pose_string.split(' ')
-        robot_pose_x = float(pose_string[0])
-        robot_pose_y = float(pose_string[1])
-        robot_pose_z = float(pose_string[2])
-        print("Robot pose -> x:" + str(robot_pose_x), " y:" + str(robot_pose_y), " z:" + str(robot_pose_z))
-
         # find the goal 
         
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
@@ -378,7 +383,8 @@ class BenchmarkRun(object):
         self.goal_pose = PoseStamped()
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
-        print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y))
+        q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
+        print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y), "q: " + str(q))
 
         # given starting robot position and goal position, find the shortest path from goal to start robot pos
 
@@ -391,9 +397,11 @@ class BenchmarkRun(object):
                 node_id = i
                 x_goal = x
                 y_goal = y
+    
         # then compute id of the nearest node to robot position (do it manually for the moment) TODO
-        start_id = 1191
+        #for i in voronoi_graph.nodes:
 
+        start_id = 1198
         # compute shortest path from node_id to start_id
         print("Compute shortest path from", node_id, "to", start_id)
         shortest_path = nx.dijkstra_path(voronoi_graph, node_id, start_id)
