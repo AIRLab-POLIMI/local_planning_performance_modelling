@@ -23,7 +23,7 @@ from xml.etree.ElementTree import Element
 import time
 from os import path
 import numpy as np
-from math import sqrt
+from math import sqrt, pi
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
@@ -194,41 +194,15 @@ class BenchmarkRun(object):
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
 
         # get the robot position from gazebo_environment.model (starting position is different according to each environment)
-            gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
-            gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
-            pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
-            pose_string = pose_string.split(' ')
-            robot_initial_pose_x = float(pose_string[0])
-            robot_initial_pose_y = float(pose_string[1])
-            robot_initial_pose_theta = float(pose_string[5])
-            print("Robot initial pose -> x: " + str(robot_initial_pose_x), " y: " + str(robot_initial_pose_y), " theta(radians): " + str(robot_initial_pose_theta))
+            # gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
+            # gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
+            # pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
+            # pose_string = pose_string.split(' ')
+            # robot_initial_pose_x = float(pose_string[0])
+            # robot_initial_pose_y = float(pose_string[1])
+            # robot_initial_pose_theta = float(pose_string[5])
 
-        # copy the configuration of the localization to the run folder and update its parameters
-        with open(original_localization_configuration_path) as localization_configuration_file:
-            localization_configuration = yaml.safe_load(localization_configuration_file)
-        if self.localization_node == 'amcl':
-            localization_configuration['alpha1'] = amcl_alpha_1
-            localization_configuration['alpha2'] = amcl_alpha_2
-            localization_configuration['alpha3'] = amcl_alpha_3
-            localization_configuration['alpha4'] = amcl_alpha_4
-            localization_configuration['initial_pose_x'] = robot_initial_pose_x
-            localization_configuration['initial_pose_y'] = robot_initial_pose_y
-            localization_configuration['initial_pose_a'] = robot_initial_pose_theta
-        elif self.localization_node == 'localization_generator':
-            localization_configuration['update_pose_rate'] = localization_generator_update_rate
-            localization_configuration['translation_error'] = localization_generator_translation_error
-            localization_configuration['rotation_error'] = localization_generator_rotation_error
-            localization_configuration['normalized_relative_translation_error'] = localization_generator_normalized_relative_translation_error
-            localization_configuration['normalized_relative_rotation_error'] = localization_generator_normalized_relative_rotation_error
-        elif self.localization_node == 'ground_truth': 
-            pass
-        
-        else:
-            raise ValueError()
-        if not path.exists(path.dirname(self.localization_configuration_path)):
-            os.makedirs(path.dirname(self.localization_configuration_path))
-        with open(self.localization_configuration_path, 'w') as localization_configuration_file:
-            yaml.dump(localization_configuration, localization_configuration_file, default_flow_style=False)
+            #print("Robot initial pose -> x: " + str(robot_initial_pose_x), " y: " + str(robot_initial_pose_y), " theta(radians): " + str(robot_initial_pose_theta))
 
         # copy the configuration of the navigation_stack to the run folder and update its parameters
         with open(original_navigation_stack_configuration_path) as navigation_stack_configuration_file:
@@ -298,45 +272,6 @@ class BenchmarkRun(object):
         with open(self.local_planner_configuration_path, 'w') as local_planner_configuration_file:
             yaml.dump(local_planner_configuration, local_planner_configuration_file, default_flow_style=False)
 
-        # copy the configuration of the gazebo world model to the run folder and update its parameters
-        gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
-        gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
-        gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/uri")[0].text = path.join("model://", path.dirname(gazebo_robot_model_sdf_relative_path))
-        if not path.exists(path.dirname(self.gazebo_world_model_path)):
-            os.makedirs(path.dirname(self.gazebo_world_model_path))
-        gazebo_original_world_model_tree.write(self.gazebo_world_model_path)
-
-        # copy the configuration of the gazebo robot sdf model to the run folder and update its parameters
-        gazebo_robot_model_sdf_tree = et.parse(original_gazebo_robot_model_sdf_path)
-        gazebo_robot_model_sdf_root = gazebo_robot_model_sdf_tree.getroot()
-
-        gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frameName")[0].text = "base_scan"
-        if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "world"
-        else:
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "parametric_error_model"  # TODO string instead of int?
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha1".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_1)
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha2".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_2)
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha3".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_3)
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha4".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_4)
-
-        if robot_model == 'hunter2':
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/maxSteer".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(max_steering_rad*1.1)
-        if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
-            os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
-        gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
-
-        # copy the configuration of the gazebo robot model to the run folder
-        if not path.exists(path.dirname(gazebo_robot_model_config_path)):
-            os.makedirs(path.dirname(gazebo_robot_model_config_path))
-        shutil.copyfile(original_gazebo_robot_model_config_path, gazebo_robot_model_config_path)
-
-        # copy the configuration of the robot urdf to the run folder and update the link names for realistic data
-        robot_realistic_urdf_tree = et.parse(original_robot_urdf_path)
-        if not path.exists(path.dirname(self.robot_realistic_urdf_path)):
-            os.makedirs(path.dirname(self.robot_realistic_urdf_path))
-        robot_realistic_urdf_tree.write(self.robot_realistic_urdf_path)
-
         # copy the configuration of the scene.xml file to the run folder
         gazebo_original_pedsim_tree = et.parse(original_pedsim_config_path)
         gazebo_original_pedsim_root = gazebo_original_pedsim_tree.getroot()
@@ -347,70 +282,70 @@ class BenchmarkRun(object):
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
         
-        # parse scene.xml
-        # gazebo_original_pedsim_tree = et.parse(self.scene_file_path)
-        # gazebo_original_pedsim_root = gazebo_original_pedsim_tree.getroot()
-
-        # remove waypoints already present 
-        # for child in gazebo_original_pedsim_root.findall('waypoint'):
-        #     gazebo_original_pedsim_root.remove(child)
-        
-        # add waypoints from voronoi graph
+        # from voronoi graph add waypoints into scene.xml 
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
             new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
             gazebo_original_pedsim_root.append(new_waypoint)
 
-        # find the goal 
+        # 1) find the goal 
         
-        # in case the graph has multiple unconnected components, remove the components with less than two nodes
+        # 1.1) in case the graph has multiple unconnected components, remove the components with less than two nodes
         too_small_voronoi_graph_components = list(filter(lambda component: len(component) < 2, nx.connected_components(voronoi_graph)))
 
         for graph_component in too_small_voronoi_graph_components:
             voronoi_graph.remove_nodes_from(graph_component)
 
-        # select the node pseudo-randomly using the run number
+        # 1.2) select the goal node pseudo-randomly using the run number
         # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
         nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
         random.Random(0).shuffle(nil)
-        self.pseudo_random_voronoi_index = nil[self.run_index % len(nil)]
+        pseudo_random_voronoi_index_goal = nil[self.run_index % len(nil)]
 
-        # convert Voronoi node to pose
+        # 1.3) convert Voronoi node to pose
         self.goal_pose = PoseStamped()
         self.goal_pose.pose = Pose()
-        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[self.pseudo_random_voronoi_index]['vertex']
+        self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
         print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y), "q: " + str(q))
 
-        # given starting robot position and goal position, find the shortest path from goal to start robot pos
-
-        # first find the node id corresponding to the goal position
-        node_id = None
-        for i in voronoi_graph.nodes:
-            x = voronoi_graph.nodes[i]['vertex'][0]
-            y = voronoi_graph.nodes[i]['vertex'][1]
-            if (x == self.goal_pose.pose.position.x and y == self.goal_pose.pose.position.y):
-                node_id = i
-                x_goal = x
-                y_goal = y
+        # 1.4) save the xy coordinates corresponding to the goal node
+        x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
+        y_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][1]
     
-        # then compute id of the nearest node to robot position (do it manually for the moment) TODO
-        # minimum_radius = goal_obstacle_min_distance
-        # iterator = filter(lambda n: voronoi_graph.nodes[n]['radius'] <= minimum_radius, voronoi_graph.nodes)
-        # print("List of nodes with radius <= 30 cm: ", list(iterator))
-        for i in voronoi_graph.nodes:
-            print("Radius of node ", i, " = ", voronoi_graph.nodes[i]['radius'])
-        
-        start_id = 1191
-        # compute shortest path from node_id to start_id
-        print("Compute shortest path from", node_id, "to", start_id)
-        shortest_path = nx.dijkstra_path(voronoi_graph, node_id, start_id)
-        print(shortest_path)
+        # 2) choose starting position for the robot between filtered voronoi nodes
+        minimum_radius = 3.0
+        iterator = filter(lambda n: voronoi_graph.nodes[n]['radius'] <= minimum_radius, voronoi_graph.nodes)
+        index_list = list(iterator)
+        print("List of nodes with radius <= 3m: ", index_list)
+        # for i in voronoi_graph.nodes:
+        #     print("Radius of node ", i, " = ", voronoi_graph.nodes[i]['radius'])
+        index_list_copy = copy.copy(index_list)  # list of the indices of the nodes in index_list
+        random.Random(0).shuffle(index_list)
+        pseudo_random_voronoi_index_start = index_list_copy[self.run_id % len(index_list_copy)]
 
-        # # remove all old agents 
-        # for child in gazebo_original_pedsim_root.findall('agent'):
-        #     gazebo_original_pedsim_root.remove(child)
+        robot_initial_pose_x = float(voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
+        robot_initial_pose_y = float(voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
+        print("robot_initial_pose_x", robot_initial_pose_x)
+        print("robot_initial_pose_y", robot_initial_pose_y)
+        print("Pseudo start: ", pseudo_random_voronoi_index_start)
+        print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
+
+        # 3) generate pseudocasually the initial orientation theta of the robot
+
+        # 3.1) create an array of 180 elements with an increment of 2pi/180 between each element 
+        orientation_array = np.arange(0.0, 360.0*pi/180, 2.0*pi/180)
+        orientation_array_copy = copy.copy(orientation_array)  
+        random.Random(0).shuffle(orientation_array_copy)
+        pseudo_random_theta = orientation_array_copy[self.run_id % len(orientation_array_copy)]
+        print("Pseudo random theta: ", pseudo_random_theta)
+        robot_initial_pose_theta = float(pseudo_random_theta)
+        
+        # given starting robot position and goal position, find the shortest path from goal to start robot pos
+        print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
+        shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
+        print(shortest_path)
         
         # prepare data for the new agent of type 2 to add in the xml (necessary so that pedestrians avoid the robot) and add it
         x_agent = 0.0   #these are the default values for agent of type 2 according to pedsim
@@ -456,6 +391,74 @@ class BenchmarkRun(object):
         # write to the file in the run folder  
         gazebo_original_pedsim_tree.write(self.pedsim_config_path)
 
+        # copy the configuration of the localization to the run folder and update its parameters
+        with open(original_localization_configuration_path) as localization_configuration_file:
+            localization_configuration = yaml.safe_load(localization_configuration_file)
+        if self.localization_node == 'amcl':
+            localization_configuration['alpha1'] = amcl_alpha_1
+            localization_configuration['alpha2'] = amcl_alpha_2
+            localization_configuration['alpha3'] = amcl_alpha_3
+            localization_configuration['alpha4'] = amcl_alpha_4
+            localization_configuration['initial_pose_x'] = robot_initial_pose_x
+            localization_configuration['initial_pose_y'] = robot_initial_pose_y
+            localization_configuration['initial_pose_a'] = robot_initial_pose_theta
+        elif self.localization_node == 'localization_generator':
+            localization_configuration['update_pose_rate'] = localization_generator_update_rate
+            localization_configuration['translation_error'] = localization_generator_translation_error
+            localization_configuration['rotation_error'] = localization_generator_rotation_error
+            localization_configuration['normalized_relative_translation_error'] = localization_generator_normalized_relative_translation_error
+            localization_configuration['normalized_relative_rotation_error'] = localization_generator_normalized_relative_rotation_error
+        elif self.localization_node == 'ground_truth': 
+            pass
+        
+        else:
+            raise ValueError()
+        if not path.exists(path.dirname(self.localization_configuration_path)):
+            os.makedirs(path.dirname(self.localization_configuration_path))
+        with open(self.localization_configuration_path, 'w') as localization_configuration_file:
+            yaml.dump(localization_configuration, localization_configuration_file, default_flow_style=False)
+            
+        # copy the configuration of the gazebo world model to the run folder and update its parameters
+        gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
+        gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
+        gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/uri")[0].text = path.join("model://", path.dirname(gazebo_robot_model_sdf_relative_path))
+        # set initial pose x y z roll pitch yaw for ground truth
+        gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text = str(robot_initial_pose_x) + " " + str(robot_initial_pose_y) + " 0.0" +  "0.0 " + "0.0 " + str(robot_initial_pose_theta)
+        if not path.exists(path.dirname(self.gazebo_world_model_path)):
+            os.makedirs(path.dirname(self.gazebo_world_model_path))
+        gazebo_original_world_model_tree.write(self.gazebo_world_model_path)
+
+        # copy the configuration of the gazebo robot sdf model to the run folder and update its parameters
+        gazebo_robot_model_sdf_tree = et.parse(original_gazebo_robot_model_sdf_path)
+        gazebo_robot_model_sdf_root = gazebo_robot_model_sdf_tree.getroot()
+
+        gazebo_robot_model_sdf_root.findall(".//sensor[@name='lidar_sensor']/plugin[@name='laserscan_realistic_plugin']/frameName")[0].text = "base_scan"
+        if alpha_1 == 0 and alpha_2 == 0 and alpha_3 == 0 and alpha_4 == 0:
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "world"
+        else:
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/odometrySource".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = "parametric_error_model"  # TODO string instead of int?
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha1".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_1)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha2".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_2)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha3".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_3)
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha4".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_4)
+
+        if robot_model == 'hunter2':
+            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/maxSteer".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(max_steering_rad*1.1)
+        if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
+            os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
+        gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
+
+        # copy the configuration of the gazebo robot model to the run folder
+        if not path.exists(path.dirname(gazebo_robot_model_config_path)):
+            os.makedirs(path.dirname(gazebo_robot_model_config_path))
+        shutil.copyfile(original_gazebo_robot_model_config_path, gazebo_robot_model_config_path)
+
+        # copy the configuration of the robot urdf to the run folder and update the link names for realistic data
+        robot_realistic_urdf_tree = et.parse(original_robot_urdf_path)
+        if not path.exists(path.dirname(self.robot_realistic_urdf_path)):
+            os.makedirs(path.dirname(self.robot_realistic_urdf_path))
+        robot_realistic_urdf_tree.write(self.robot_realistic_urdf_path)
+
         # write run info to file
         run_info_dict = dict()
         run_info_dict["run_id"] = self.run_id
@@ -498,6 +501,7 @@ class BenchmarkRun(object):
             print_error(e)
 
     def execute_run(self):
+        #pass
         self.log(event="run_start")
         local_planner_node = self.run_parameters['local_planner_node']
         pedestrian_number = self.run_parameters['pedestrian_number']
