@@ -322,7 +322,7 @@ class BenchmarkRun(object):
         # for i in voronoi_graph.nodes:
         #     print("Radius of node ", i, " = ", voronoi_graph.nodes[i]['radius'])
         index_list_copy = copy.copy(index_list)  # list of the indices of the nodes in index_list
-        random.Random(0).shuffle(index_list)
+        random.Random(0).shuffle(index_list_copy)
         pseudo_random_voronoi_index_start = index_list_copy[self.run_id % len(index_list_copy)]
 
         robot_initial_pose_x = float(voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
