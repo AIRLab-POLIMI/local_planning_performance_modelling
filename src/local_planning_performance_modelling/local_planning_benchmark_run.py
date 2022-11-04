@@ -423,7 +423,7 @@ class BenchmarkRun(object):
         gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
         gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/uri")[0].text = path.join("model://", path.dirname(gazebo_robot_model_sdf_relative_path))
         # set initial pose x y z roll pitch yaw for ground truth
-        gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text = str(robot_initial_pose_x) + " " + str(robot_initial_pose_y) + " 0.0" +  "0.0 " + "0.0 " + str(robot_initial_pose_theta)
+        gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text = str(robot_initial_pose_x) + " " + str(robot_initial_pose_y) + " 0.0" +  " 0.0" + " 0.0 " + str(robot_initial_pose_theta)
         if not path.exists(path.dirname(self.gazebo_world_model_path)):
             os.makedirs(path.dirname(self.gazebo_world_model_path))
         gazebo_original_world_model_tree.write(self.gazebo_world_model_path)
