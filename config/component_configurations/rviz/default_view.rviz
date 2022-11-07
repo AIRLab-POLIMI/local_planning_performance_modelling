@@ -8,10 +8,11 @@ Panels:
         - /TF1/Frames1
         - /TF1/Tree1
         - /TrackedPersons1
-        - /TrackedGroups1
         - /Marker1
         - /MarkerArray1
         - /MarkerArray1/Namespaces1
+        - /PoseArray1
+        - /Odometry1
       Splitter Ratio: 0.38842976093292236
     Tree Height: 2240
   - Class: rviz/Selection
@@ -384,7 +385,7 @@ Visualization Manager:
       Color map offset: 0
       Color transform: Rainbow
       Connect group members: true
-      Enabled: true
+      Enabled: false
       Excluded group IDs: ""
       Excluded person IDs: ""
       Font color: 255; 255; 255
@@ -409,7 +410,7 @@ Visualization Manager:
       Topic: ""
       Tracked persons topic: ""
       Unreliable: false
-      Value: true
+      Value: false
       Z offset:
         Use Z position from message: false
         Value: 0
@@ -445,6 +446,58 @@ Visualization Manager:
         waypoint_id_8: true
       Queue Size: 100
       Value: true
+    - Alpha: 1
+      Arrow Length: 0.30000001192092896
+      Axes Length: 0.30000001192092896
+      Axes Radius: 0.009999999776482582
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.07000000029802322
+      Head Radius: 0.029999999329447746
+      Name: PoseArray
+      Queue Size: 10
+      Shaft Length: 0.23000000417232513
+      Shaft Radius: 0.009999999776482582
+      Shape: Arrow (3D)
+      Topic: /particlecloud
+      Unreliable: false
+      Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 100
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Queue Size: 10
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 255; 25; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /pedsim_simulator/robot_position
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -472,7 +525,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.0050008418038487434
+      Angle: -6.255004405975342
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -482,7 +535,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 176.95050048828125
+      Scale: 215.9413604736328
       Target Frame: <Fixed Frame>
       X: -0.5478886961936951
       Y: -1.0329771041870117

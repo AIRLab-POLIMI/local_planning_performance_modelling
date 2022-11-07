@@ -2,7 +2,7 @@ run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 #run_index: &id001 [0, 1]
 run_replication_index: &id003 [0]
 
-environment_name: &id002 [7A-2]
+environment_name: &id002 [airlab]
 #environment_name: &id002 [7A-2, airlab, fr079, intel, mexico, office_b]
 
 combinatorial_parameters: [
@@ -16,7 +16,7 @@ combinatorial_parameters: [
     run_index: *id001,
     run_replication_index: *id003,
     environment_name: *id002,
-    pedestrian_number: [4],
+    pedestrian_number: [5],
     pedestrian_max_vel: [0.3],  # ha senso solo per pedestrian_number > 0
   },
   #{

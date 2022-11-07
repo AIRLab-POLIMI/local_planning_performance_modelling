@@ -100,6 +100,7 @@ class BenchmarkRun(object):
         hunter2_footprint = self.benchmark_configuration['hunter2_footprint']
         hunter2_footprint_string = str(hunter2_footprint)
 
+        #TODO Warning: se usiamo un global/local planner (TEB) con primitive e min_turning_radius allora cambia queste righe
         turtlebot_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
         turtlebot_min_turning_radius = float(hunter2_wheelbase / np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
         turtlebot_footprint = self.benchmark_configuration['turtlebot_footprint']
@@ -110,7 +111,8 @@ class BenchmarkRun(object):
         max_circumscribing_circle_radius = float(np.max(np.fabs(np.array(turtlebot_footprint))))        # approx. 0.2
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
-        goal_obstacle_min_distance = 0.3  # minimum distance between goals and obstacles
+        robot_circumscribing_radius = 0.3  # robot circumscribing radius from the footprint of the robot + 0.1m margin more or less
+        pedestrian_circumscribing_radius = 0.35
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -179,7 +181,7 @@ class BenchmarkRun(object):
         supervisor_configuration['pid_father'] = os.getpid()
         supervisor_configuration['use_sim_time'] = self.use_sim_time
         supervisor_configuration['ground_truth_map_info_path'] = self.map_info_file_path
-        supervisor_configuration['goal_obstacle_min_distance'] = goal_obstacle_min_distance
+        supervisor_configuration['goal_obstacle_min_distance'] = robot_circumscribing_radius
         supervisor_configuration['goal_publication_type'] = 'action' if local_planner_node in ['dwa', 'teb', 'rpp'] else 'topic' 
         if self.localization_node == 'amcl':
             supervisor_configuration['estimated_pose_correction_topic'] = "/amcl_pose"
@@ -280,8 +282,21 @@ class BenchmarkRun(object):
 
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=goal_obstacle_min_distance).copy()
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius).copy()
+
+        # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
+        initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
+        initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=initial_node_min_distance).copy()
+
         
+        # Requirement 1: il pedone deve essere ad una distanza >= initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
+        # The above requirement guarantees that the pedestrians will not spawn too close to the robot, 
+        # hence causing an initial collision (this could happen if the initial node and goal node are the same or if they are nearby nodes)
+        # Requirement 2: peds 
+
+        # per il sampling: 
+        # 1) fai variare theta da 0 e inf, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
+
         # from voronoi graph add waypoints into scene.xml 
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
@@ -315,33 +330,42 @@ class BenchmarkRun(object):
         y_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][1]
     
         # 2) choose starting position for the robot between filtered voronoi nodes
-        minimum_radius = 3.0
-        iterator = filter(lambda n: voronoi_graph.nodes[n]['radius'] <= minimum_radius, voronoi_graph.nodes)
+        maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
+        iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
         index_list = list(iterator)
         print("List of nodes with radius <= 3m: ", index_list)
-        # for i in voronoi_graph.nodes:
-        #     print("Radius of node ", i, " = ", voronoi_graph.nodes[i]['radius'])
+        # for i in initial_node_voronoi_graph.nodes:
+        #     print("Radius of node ", i, " = ", initial_node_voronoi_graph.nodes[i]['radius'])
+        
         index_list_copy = copy.copy(index_list)  # list of the indices of the nodes in index_list
         random.Random(0).shuffle(index_list_copy)
-        pseudo_random_voronoi_index_start = index_list_copy[self.run_id % len(index_list_copy)]
+        pseudo_random_voronoi_index_start = index_list_copy[(self.run_index+1) % len(index_list_copy)]  
 
-        robot_initial_pose_x = float(voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
-        robot_initial_pose_y = float(voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
+        robot_initial_pose_x = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
+        robot_initial_pose_y = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
         print("robot_initial_pose_x", robot_initial_pose_x)
         print("robot_initial_pose_y", robot_initial_pose_y)
         print("Pseudo start: ", pseudo_random_voronoi_index_start)
         print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
 
+        initial_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
+        print("Euclidean distance", initial_goal_euclidean_dist)
+        # if (distanza_euclidea >= initial_node_max_distance)
+        # Case 1    
+        # else
+        # Case 2
+
         # 3) generate pseudocasually the initial orientation theta of the robot
 
-        # 3.1) create an array of 180 elements with an increment of 2pi/180 between each element 
-        orientation_array = np.arange(0.0, 360.0*pi/180, 2.0*pi/180)
+        # 3.1) create an array of size = num_angles_buckets, whose elements are set incrementally
+        num_angles_buckets = 16
+        orientation_array = np.arange(0.0, 2.0*pi, 2.0*pi/num_angles_buckets)   # array from 0.0 to 2pi wit an increment of 2pi/num_angles_buckets
         orientation_array_copy = copy.copy(orientation_array)  
         random.Random(0).shuffle(orientation_array_copy)
-        pseudo_random_theta = orientation_array_copy[self.run_id % len(orientation_array_copy)]
+        pseudo_random_theta = orientation_array_copy[self.run_index % len(orientation_array_copy)]
         print("Pseudo random theta: ", pseudo_random_theta)
         robot_initial_pose_theta = float(pseudo_random_theta)
-        
+
         # given starting robot position and goal position, find the shortest path from goal to start robot pos
         print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
@@ -365,7 +389,6 @@ class BenchmarkRun(object):
         # now prepare the agents which will follow the shortest path
         x_agent = x_goal
         y_agent = y_goal
-        print(x_goal, y_goal)
         dx = 0.5
         dy = 0.5
         n = pedestrian_number
@@ -402,6 +425,9 @@ class BenchmarkRun(object):
             localization_configuration['initial_pose_x'] = robot_initial_pose_x
             localization_configuration['initial_pose_y'] = robot_initial_pose_y
             localization_configuration['initial_pose_a'] = robot_initial_pose_theta
+            localization_configuration['initial_cov_xx'] = 0.5 * 0.5  
+            localization_configuration['initial_cov_yy'] = 0.5 * 0.5
+            localization_configuration['initial_cov_aa'] = (pi/12)*(pi/12)      # Reference: http://wiki.ros.org/amcl#Parameters
         elif self.localization_node == 'localization_generator':
             localization_configuration['update_pose_rate'] = localization_generator_update_rate
             localization_configuration['translation_error'] = localization_generator_translation_error

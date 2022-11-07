@@ -65,7 +65,7 @@ class LocalPlanningBenchmarkSupervisor:
     def __init__(self):
 
         # Debug variable
-        self.prevent_shutdown = False  # Should be False, unless you are currently debugging. if True, runs will never end.
+        self.prevent_shutdown = True  # Should be False, unless you are currently debugging. if True, runs will never end.
 
         # topics, services, actions, entities and frames names
         scan_topic = rospy.get_param('~scan_topic')
@@ -94,10 +94,10 @@ class LocalPlanningBenchmarkSupervisor:
         self.ps_pid_father = rospy.get_param('~pid_father')
         self.ps_processes = psutil.Process(self.ps_pid_father).children(recursive=True)  # list of processes children of the benchmark script, i.e., all ros nodes of the benchmark including this one
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.ground_truth_map_info_path)
-        self.initial_pose_covariance_matrix = np.zeros((6, 6), dtype=float)
-        self.initial_pose_covariance_matrix[0, 0] = rospy.get_param('~initial_pose_std_xy')**2
-        self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
-        self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
+        # self.initial_pose_covariance_matrix = np.zeros((6, 6), dtype=float)
+        # self.initial_pose_covariance_matrix[0, 0] = rospy.get_param('~initial_pose_std_xy')**2
+        # self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
+        # self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
         self.goal_tolerance = rospy.get_param('~goal_tolerance')
         self.goal_obstacle_min_distance = rospy.get_param('~goal_obstacle_min_distance')
         self.goal_publication_type = rospy.get_param('~goal_publication_type')  
