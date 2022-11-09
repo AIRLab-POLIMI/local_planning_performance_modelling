@@ -23,7 +23,7 @@ from xml.etree.ElementTree import Element
 import time
 from os import path
 import numpy as np
-from math import sqrt, pi
+from math import sqrt, pi, cos, sin
 
 from performance_modelling_py.benchmark_execution.log_software_versions import log_packages_and_repos
 from performance_modelling_py.utils import backup_file_if_exists, print_info, print_error, print_fatal
@@ -294,9 +294,6 @@ class BenchmarkRun(object):
         # hence causing an initial collision (this could happen if the initial node and goal node are the same or if they are nearby nodes)
         # Requirement 2: peds 
 
-        # per il sampling: 
-        # 1) fai variare theta da 0 e inf, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
-
         # from voronoi graph add waypoints into scene.xml 
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
@@ -348,12 +345,33 @@ class BenchmarkRun(object):
         print("Pseudo start: ", pseudo_random_voronoi_index_start)
         print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
 
-        initial_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
-        print("Euclidean distance", initial_goal_euclidean_dist)
-        # if (distanza_euclidea >= initial_node_max_distance)
-        # Case 1    
-        # else
-        # Case 2
+        initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
+        print("Euclidean distance", initial_pose_to_goal_euclidean_dist)
+        # if (initial_pose_to_goal_euclidean_dist >= initial_node_min_distance): # Case 1: there is no overlapping between initial and goal, spawn agents in goal.   
+        #     x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
+        #     y_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][1]
+        # else: # Case 2
+            # sample and choose x,y such that they don't belong to the red-zone around the robot initial position
+        sample_list = list()
+        for r in np.arange(initial_node_min_distance/8.0, initial_node_min_distance, initial_node_min_distance/8.0):   #range(start, end, increment)
+            for theta in np.arange(0.0, 2*pi, 2*pi/16):
+                x = r * cos(theta)
+                y = r * sin(theta)
+                temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
+                temp_list.append(x)
+                temp_list.append(y)
+                sample_list.append(temp_list)
+        
+        print(sample_list)
+            
+                
+                
+            # per il sampling: 
+            # 1) fai variare theta da 0 a 2pi, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
+            # 2) Aggiungi i punti in una lista
+            # 3) Scegli un punto pseudocasualmente
+            # 4) controlla che rispetti il requisito di distanza dal punto di initial robot pose
+
 
         # 3) generate pseudocasually the initial orientation theta of the robot
 
