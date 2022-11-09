@@ -353,7 +353,8 @@ class BenchmarkRun(object):
         # else: # Case 2
             # sample and choose x,y such that they don't belong to the red-zone around the robot initial position
         sample_list = list()
-        for r in np.arange(initial_node_min_distance/8.0, initial_node_min_distance, initial_node_min_distance/8.0):   #range(start, end, increment)
+        for r in np.arange(initial_node_min_distance/8.0, initial_node_min_distance, initial_node_min_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
+                                                                                                                        # (and it is useless to even have one sample of it since we already know the goal position is not a candidate for spawning peds)
             for theta in np.arange(0.0, 2*pi, 2*pi/16):
                 x = r * cos(theta)
                 y = r * sin(theta)
