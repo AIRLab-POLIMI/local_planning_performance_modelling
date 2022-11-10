@@ -112,7 +112,7 @@ class BenchmarkRun(object):
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
         robot_circumscribing_radius = 0.3  # robot circumscribing radius from the footprint of the robot + 0.1m margin more or less
-        pedestrian_circumscribing_radius = 0.35
+        pedestrian_circumscribing_radius = 0.1
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -324,14 +324,14 @@ class BenchmarkRun(object):
 
         # 2) choose starting position for the robot between filtered voronoi nodes
 
-        # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
-        # TODO fix max e min, max < min a volte.
-        initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
-        initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=initial_node_min_distance).copy()
-        initial_node_max_distance = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['radius'] - pedestrian_circumscribing_radius
-        print("Max distance: ", initial_node_max_distance)
-        print("Min distance: ", initial_node_min_distance)
+        # define max and min distance for the pedestrian
+        pedestrian_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
+        pedestrian_max_distance = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['radius'] - pedestrian_circumscribing_radius
+        print("Ped max distance: ", pedestrian_max_distance)
+        print("Ped min distance: ", pedestrian_min_distance)
         maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
+        # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
+        initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
         index_list = list(iterator)
         print("List of nodes with radius <= 3m: ", index_list)
@@ -351,39 +351,46 @@ class BenchmarkRun(object):
 
         initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
         print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
-        # if (initial_pose_to_goal_euclidean_dist >= initial_node_min_distance): # Case 1: there is no overlapping between initial and goal, spawn agents in goal.   
-        #     x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
-        #     y_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][1]
-        # else: # Case 2
-            # sample and choose x,y such that they don't belong to the red-zone around the robot initial position
-        is_done = False    
-        while not is_done:
+        if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance): # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal.   
+            print("No overlapping between robot initial pose and goal")
+            x_sample, y_sample = x_goal, y_goal
+        else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
+            print("Overlapping between robot initial pose and goal")
+            # generate a list of samples of the circle defined by the origin equal to goal_position and ray equal to initial_node_max_distance
             sample_list = list()
-            for r in np.arange(initial_node_max_distance/8.0, initial_node_max_distance, initial_node_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
-                                                                                                                            # (and it is useless to even have one sample of it since we already know the goal position is not a candidate for spawning peds)
+            for r in np.arange(pedestrian_max_distance/8.0, pedestrian_max_distance + pedestrian_max_distance/8.0, pedestrian_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
+                                                                                                                                                    # Notice that arange() does not include the end, so to include it is necessary to add the increment
                 for theta in np.arange(0.0, 2*pi, 2*pi/16):
                     x = r * cos(theta)
                     y = r * sin(theta)
                     temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
-                    temp_list.append(x)
-                    temp_list.append(y)
+                    temp_list.append(r)
+                    temp_list.append(theta)
                     sample_list.append(temp_list)
-            
-            #print(sample_list)
-            random.Random(0).shuffle(sample_list)
-            pseudo_random_sample = sample_list[self.run_index % len(sample_list)]   
-            print(pseudo_random_sample)
-            x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
-            print("x=", x_sample, "y=", y_sample)
-            sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
-            print("Sample to start dist: ", sample_to_start_dist) 
-            if sample_to_start_dist < initial_node_min_distance: 
-                print("Error, chosen sample is in the red forbidden zone.\n")
-            else: 
+                
+            print(sample_list)
+
+            # choose pseudocasually one sample. If it doesn't satisfies the condition, then choose another
+            is_done = False    
+            while not is_done:
+                i = 0
+                random.Random(0).shuffle(sample_list)
+                pseudo_random_sample = sample_list[i % len(sample_list)]   
+                x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
+                #print("x=", x_sample, "y=", y_sample)
+                sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
+                # sample_to_goal_dist = sqrt((x_sample - self.goal_pose.pose.position.x)**2 + (y_sample - self.goal_pose.pose.position.y)**2)
+                print("Sample to start dist: ", sample_to_start_dist) 
                 is_done = True
-                print("Valid sample!\n")
-        
-              
+                if sample_to_start_dist < pedestrian_min_distance: 
+                    print("Error, chosen sample is in the forbidden zone, choosing another sample..\n")
+                    # remove the sample from the list
+                    sample_list.remove(pseudo_random_sample)
+                    i+=1
+                else: 
+                    is_done = True
+                    print("Valid sample: ", pseudo_random_sample, "\n")
+       
             # per il sampling: 
             # 1) fai variare theta da 0 a 2pi, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
             # 2) Aggiungi i punti in una lista
@@ -421,7 +428,7 @@ class BenchmarkRun(object):
         gazebo_original_pedsim_root.append(new_agent) 
         
         # now prepare the agents which will follow the shortest path
-        x_agent, y_agent = x_goal, y_goal
+        x_agent, y_agent = x_sample, y_sample
         dx = dy = 0.5
         n = pedestrian_number
         type = 10
