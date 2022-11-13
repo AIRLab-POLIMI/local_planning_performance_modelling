@@ -381,7 +381,7 @@ class BenchmarkRun(object):
                 sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
                 # sample_to_goal_dist = sqrt((x_sample - self.goal_pose.pose.position.x)**2 + (y_sample - self.goal_pose.pose.position.y)**2)
                 print("Sample to start dist: ", sample_to_start_dist) 
-                is_done = True
+
                 if sample_to_start_dist < pedestrian_min_distance: 
                     print("Error, chosen sample is in the forbidden zone, choosing another sample..\n")
                     # remove the sample from the list
@@ -414,8 +414,8 @@ class BenchmarkRun(object):
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
         print(shortest_path)
         
-        # prepare data for the new agent of type 2 to add in the xml (necessary so that pedestrians avoid the robot) and add it
-        x_agent = y_agent = 0.0   #these are the default values for agent of type 2 according to pedsim
+        # prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
+        x_agent, y_agent = robot_initial_pose_x, robot_initial_pose_y   
         dx = dy = 0.5
         n = 1
         type = 2
@@ -425,6 +425,7 @@ class BenchmarkRun(object):
                                              'dy': str(dy), 
                                              'n': str(n), 
                                              'type': str(type)})
+                                             
         gazebo_original_pedsim_root.append(new_agent) 
         
         # now prepare the agents which will follow the shortest path
