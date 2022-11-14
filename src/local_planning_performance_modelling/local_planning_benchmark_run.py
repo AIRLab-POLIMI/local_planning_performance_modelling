@@ -112,7 +112,7 @@ class BenchmarkRun(object):
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
         robot_circumscribing_radius = 0.3  # robot circumscribing radius from the footprint of the robot + 0.1m margin more or less
-        pedestrian_circumscribing_radius = 0.1
+        pedestrian_circumscribing_radius = 0.35
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -283,7 +283,9 @@ class BenchmarkRun(object):
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius).copy()
-
+        #TODO sostituire con questo voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + pedestrian_circumscribing_radius).copy()
+        
+        
         # Requirement 1: il pedone deve essere ad una distanza >= initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
         # The above requirement guarantees that the pedestrians will not spawn too close to the robot, 
         # hence causing an initial collision (this could happen if the initial node and goal node are the same or if they are nearby nodes)
@@ -333,8 +335,10 @@ class BenchmarkRun(object):
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
+        # TODO filtra i nodi che sono all'interno della stessa componente del goal node, così ci assicuriamo che goal e start siano connessi
+        # TODO controlla cosa succede in intel
         index_list = list(iterator)
-        print("List of nodes with radius <= 3m: ", index_list)
+        print("List of nodes with radius <= 3m and able to reach the goal: ", index_list)
         # for i in initial_node_voronoi_graph.nodes:
         #     print("Radius of node ", i, " = ", initial_node_voronoi_graph.nodes[i]['radius'])
         
@@ -410,6 +414,8 @@ class BenchmarkRun(object):
         robot_initial_pose_theta = float(pseudo_random_theta)
 
         # given starting robot position and goal position, find the shortest path from goal to start robot pos
+        #TODO sometimes path does not exist because goal is not reachable from START
+        # check that start and goal 
         print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
         print(shortest_path)
@@ -430,7 +436,7 @@ class BenchmarkRun(object):
         
         # now prepare the agents which will follow the shortest path
         x_agent, y_agent = x_sample, y_sample
-        dx = dy = 0.5
+        dx = dy = 0.0
         n = pedestrian_number
         type = 10
         new_agent = Element('agent', attrib={'x': str(x_agent), 
