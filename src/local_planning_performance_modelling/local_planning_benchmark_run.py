@@ -295,7 +295,7 @@ class BenchmarkRun(object):
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
-            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(1)})
+            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(0.5)})
             gazebo_original_pedsim_root.append(new_waypoint)
 
         # 1) find the goal 
@@ -436,7 +436,7 @@ class BenchmarkRun(object):
         
         # now prepare the agents which will follow the shortest path
         x_agent, y_agent = x_sample, y_sample
-        dx = dy = 0.0
+        dx = dy = 0.5
         n = pedestrian_number
         type = 10
         new_agent = Element('agent', attrib={'x': str(x_agent), 
