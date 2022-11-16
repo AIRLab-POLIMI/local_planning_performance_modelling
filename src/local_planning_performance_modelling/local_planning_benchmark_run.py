@@ -112,7 +112,7 @@ class BenchmarkRun(object):
                                                
         #goal_obstacle_min_distance = 0.2 + max_circumscribing_circle_radius  # minimum distance between goals and obstacles, as the robots largest radius plus a margin TODO this stuff should be a run parameter
         robot_circumscribing_radius = 0.3  # robot circumscribing radius from the footprint of the robot + 0.1m margin more or less
-        pedestrian_circumscribing_radius = 0.35
+        pedestrian_circumscribing_radius = 0.25
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
@@ -181,7 +181,8 @@ class BenchmarkRun(object):
         supervisor_configuration['pid_father'] = os.getpid()
         supervisor_configuration['use_sim_time'] = self.use_sim_time
         supervisor_configuration['ground_truth_map_info_path'] = self.map_info_file_path
-        supervisor_configuration['goal_obstacle_min_distance'] = robot_circumscribing_radius
+        supervisor_configuration['robot_circumscribing_radius'] = robot_circumscribing_radius
+        supervisor_configuration['pedestrian_circumscribing_radius'] = pedestrian_circumscribing_radius
         supervisor_configuration['goal_publication_type'] = 'action' if local_planner_node in ['dwa', 'teb', 'rpp'] else 'topic' 
         if self.localization_node == 'amcl':
             supervisor_configuration['estimated_pose_correction_topic'] = "/amcl_pose"
@@ -282,7 +283,7 @@ class BenchmarkRun(object):
 
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius).copy()
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius).copy()
         #TODO sostituire con questo voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + pedestrian_circumscribing_radius).copy()
         
         
@@ -292,10 +293,11 @@ class BenchmarkRun(object):
         # Requirement 2: peds 
 
         # from voronoi graph add waypoints into scene.xml 
+        waypoint_radius = 0.5
         for i in voronoi_graph.nodes:
             x = voronoi_graph.nodes[i]['vertex'][0]
             y = voronoi_graph.nodes[i]['vertex'][1]
-            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(0.5)})
+            new_waypoint = Element('waypoint', attrib={'id': 'waypoint_id_' + str(i), 'x': str(x), 'y': str(y), 'r': str(waypoint_radius)})
             gazebo_original_pedsim_root.append(new_waypoint)
 
         # 1) find the goal 
@@ -311,6 +313,7 @@ class BenchmarkRun(object):
         nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
         random.Random(0).shuffle(nil)
         pseudo_random_voronoi_index_goal = nil[self.run_index % len(nil)]
+        print("goal index: ", pseudo_random_voronoi_index_goal)
 
         # 1.3) convert Voronoi node to pose
         self.goal_pose = PoseStamped()
@@ -322,6 +325,10 @@ class BenchmarkRun(object):
         # 1.4) save the xy coordinates corresponding to the goal node
         x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
         y_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][1]
+
+        # 1.5) find the connected component contaning goal node
+        goal_connected_component = nx.node_connected_component(voronoi_graph, pseudo_random_voronoi_index_goal)
+        print("Goal connected component: ", goal_connected_component)
     
 
         # 2) choose starting position for the robot between filtered voronoi nodes
@@ -335,14 +342,20 @@ class BenchmarkRun(object):
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
-        # TODO filtra i nodi che sono all'interno della stessa componente del goal node, così ci assicuriamo che goal e start siano connessi
         # TODO controlla cosa succede in intel
         index_list = list(iterator)
-        print("List of nodes with radius <= 3m and able to reach the goal: ", index_list)
+        print("List of nodes with radius <= 3m: ", index_list)
+        # turn the integer obtained from the list into a set and then check if it is subset of the goal connected component
+        filtered = filter(lambda l: set([l]).issubset(goal_connected_component), index_list)
+        index_filtered_list = list(filtered)
+        print("before remove", index_filtered_list)
+        index_filtered_list.remove(pseudo_random_voronoi_index_goal)
+        print("after remove", index_filtered_list)
+        #print("List of nodes with radius <= 3m and able to reach the goal: ", index_filtered_list)
         # for i in initial_node_voronoi_graph.nodes:
         #     print("Radius of node ", i, " = ", initial_node_voronoi_graph.nodes[i]['radius'])
         
-        index_list_copy = copy.copy(index_list)  # list of the indices of the nodes in index_list
+        index_list_copy = copy.copy(index_filtered_list)  # list of the indices of the nodes in index_list
         random.Random(0).shuffle(index_list_copy)
         pseudo_random_voronoi_index_start = index_list_copy[(self.run_index+1) % len(index_list_copy)]  
 
@@ -355,7 +368,7 @@ class BenchmarkRun(object):
 
         initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
         print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
-        if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance): # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal.   
+        if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance + pedestrian_max_distance): # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal.   
             print("No overlapping between robot initial pose and goal")
             x_sample, y_sample = x_goal, y_goal
         else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
@@ -365,11 +378,11 @@ class BenchmarkRun(object):
             for r in np.arange(pedestrian_max_distance/8.0, pedestrian_max_distance + pedestrian_max_distance/8.0, pedestrian_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
                                                                                                                                                     # Notice that arange() does not include the end, so to include it is necessary to add the increment
                 for theta in np.arange(0.0, 2*pi, 2*pi/16):
-                    x = r * cos(theta)
-                    y = r * sin(theta)
+                    x = x_goal + r * cos(theta)
+                    y = y_goal + r * sin(theta)
                     temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
-                    temp_list.append(r)
-                    temp_list.append(theta)
+                    temp_list.append(x)
+                    temp_list.append(y)
                     sample_list.append(temp_list)
                 
             print(sample_list)

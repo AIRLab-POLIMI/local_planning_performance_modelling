@@ -65,7 +65,7 @@ class LocalPlanningBenchmarkSupervisor:
     def __init__(self):
 
         # Debug variable
-        self.prevent_shutdown = True  # Should be False, unless you are currently debugging. if True, runs will never end.
+        self.prevent_shutdown = False  # Should be False, unless you are currently debugging. if True, runs will never end.
 
         # topics, services, actions, entities and frames names
         scan_topic = rospy.get_param('~scan_topic')
@@ -99,7 +99,9 @@ class LocalPlanningBenchmarkSupervisor:
         # self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
         # self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
         self.goal_tolerance = rospy.get_param('~goal_tolerance')
-        self.goal_obstacle_min_distance = rospy.get_param('~goal_obstacle_min_distance')
+        self.robot_circumscribing_radius = rospy.get_param('~robot_circumscribing_radius')
+        self.pedestrian_circumscribing_radius = rospy.get_param('~pedestrian_circumscribing_radius')
+
         self.goal_publication_type = rospy.get_param('~goal_publication_type')  
 
         # run variables
@@ -182,7 +184,7 @@ class LocalPlanningBenchmarkSupervisor:
         print_info("finished waiting to receive first sensor message from environment", logger=rospy.loginfo)
 
         # get deleaved reduced Voronoi graph from ground truth map
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.robot_circumscribing_radius + 2.0*self.pedestrian_circumscribing_radius).copy()
         # print_fatal(voronoi_graph.nodes)
         # for i in voronoi_graph.nodes:
         #     print_info(i, voronoi_graph.nodes[i]['vertex'])
