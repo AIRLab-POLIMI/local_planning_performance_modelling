@@ -346,18 +346,22 @@ class BenchmarkRun(object):
         index_list = list(iterator)
         print("List of nodes with radius <= 3m: ", index_list)
         # turn the integer obtained from the list into a set and then check if it is subset of the goal connected component
-        filtered = filter(lambda l: set([l]).issubset(goal_connected_component), index_list)
+        filtered = filter(lambda l: l in goal_connected_component, index_list)
         index_filtered_list = list(filtered)
         print("before remove", index_filtered_list)
         index_filtered_list.remove(pseudo_random_voronoi_index_goal)
         print("after remove", index_filtered_list)
+
+        #TODO possibile che 2 nodi nella stessa posizione abbiano indici diversi o 2 nodi con stesso indici abbiano posizione diversi
+        # controlla che la lista di id x y del 1 voronoi graph dia lo stesso risultato di id x y del 2 voronoi graph
+        
         #print("List of nodes with radius <= 3m and able to reach the goal: ", index_filtered_list)
         # for i in initial_node_voronoi_graph.nodes:
         #     print("Radius of node ", i, " = ", initial_node_voronoi_graph.nodes[i]['radius'])
         
         index_list_copy = copy.copy(index_filtered_list)  # list of the indices of the nodes in index_list
-        random.Random(0).shuffle(index_list_copy)
-        pseudo_random_voronoi_index_start = index_list_copy[(self.run_index+1) % len(index_list_copy)]  
+        random.Random(1).shuffle(index_list_copy)
+        pseudo_random_voronoi_index_start = index_list_copy[self.run_index % len(index_list_copy)]  
 
         robot_initial_pose_x = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
         robot_initial_pose_y = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
@@ -365,55 +369,6 @@ class BenchmarkRun(object):
         print("robot_initial_pose_y", robot_initial_pose_y)
         print("Pseudo start: ", pseudo_random_voronoi_index_start)
         print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
-
-        initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
-        print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
-        if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance + pedestrian_max_distance): # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal.   
-            print("No overlapping between robot initial pose and goal")
-            x_sample, y_sample = x_goal, y_goal
-        else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
-            print("Overlapping between robot initial pose and goal")
-            # generate a list of samples of the circle defined by the origin equal to goal_position and ray equal to initial_node_max_distance
-            sample_list = list()
-            for r in np.arange(pedestrian_max_distance/8.0, pedestrian_max_distance + pedestrian_max_distance/8.0, pedestrian_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
-                                                                                                                                                    # Notice that arange() does not include the end, so to include it is necessary to add the increment
-                for theta in np.arange(0.0, 2*pi, 2*pi/16):
-                    x = x_goal + r * cos(theta)
-                    y = y_goal + r * sin(theta)
-                    temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
-                    temp_list.append(x)
-                    temp_list.append(y)
-                    sample_list.append(temp_list)
-                
-            print(sample_list)
-
-            # choose pseudocasually one sample. If it doesn't satisfies the condition, then choose another
-            is_done = False    
-            while not is_done:
-                i = 0
-                random.Random(0).shuffle(sample_list)
-                pseudo_random_sample = sample_list[i % len(sample_list)]   
-                x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
-                #print("x=", x_sample, "y=", y_sample)
-                sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
-                # sample_to_goal_dist = sqrt((x_sample - self.goal_pose.pose.position.x)**2 + (y_sample - self.goal_pose.pose.position.y)**2)
-                print("Sample to start dist: ", sample_to_start_dist) 
-
-                if sample_to_start_dist < pedestrian_min_distance: 
-                    print("Error, chosen sample is in the forbidden zone, choosing another sample..\n")
-                    # remove the sample from the list
-                    sample_list.remove(pseudo_random_sample)
-                    i+=1
-                else: 
-                    is_done = True
-                    print("Valid sample: ", pseudo_random_sample, "\n")
-       
-            # per il sampling: 
-            # 1) fai variare theta da 0 a 2pi, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
-            # 2) Aggiungi i punti in una lista
-            # 3) Scegli un punto pseudocasualmente
-            # 4) controlla che rispetti il requisito di distanza dal punto di initial robot pose
-
 
         # 3) generate pseudocasually the initial orientation theta of the robot
 
@@ -426,16 +381,14 @@ class BenchmarkRun(object):
         print("Pseudo random theta: ", pseudo_random_theta)
         robot_initial_pose_theta = float(pseudo_random_theta)
 
-        # given starting robot position and goal position, find the shortest path from goal to start robot pos
-        #TODO sometimes path does not exist because goal is not reachable from START
-        # check that start and goal 
+        # 4.1) given starting robot position and goal position, find the shortest path from goal to start robot pos
         print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
         print(shortest_path)
-        
-        # prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
+
+        # 4.2) prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
         x_agent, y_agent = robot_initial_pose_x, robot_initial_pose_y   
-        dx = dy = 0.5
+        dx = dy = 0.0
         n = 1
         type = 2
         new_agent = Element('agent', attrib={'x': str(x_agent), 
@@ -445,29 +398,144 @@ class BenchmarkRun(object):
                                              'n': str(n), 
                                              'type': str(type)})
                                              
-        gazebo_original_pedsim_root.append(new_agent) 
+        gazebo_original_pedsim_root.append(new_agent)
         
-        # now prepare the agents which will follow the shortest path
-        x_agent, y_agent = x_sample, y_sample
-        dx = dy = 0.5
-        n = pedestrian_number
-        type = 10
-        new_agent = Element('agent', attrib={'x': str(x_agent), 
-                                             'y': str(y_agent), 
-                                             'dx': str(dx), 
-                                             'dy': str(dy), 
-                                             'n': str(n), 
-                                             'type': str(type)})
 
-        # add waypoints found in the shortest path as sub-elements of the new agent
-        for i in shortest_path:
-            et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+        initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
+        print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
+        if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance + pedestrian_max_distance): # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal.   
+            print("No overlapping between robot initial pose and goal")
+            x_agent, y_agent = x_goal, y_goal
+            dx = dy = 0.1
+            n = pedestrian_number
+            type = 10
+            new_agent = Element('agent', attrib={'x': str(x_agent), 
+                                                'y': str(y_agent), 
+                                                'dx': str(dx), 
+                                                'dy': str(dy), 
+                                                'n': str(n), 
+                                                'type': str(type)})
 
-        # for i in reversed(shortest_path):
-        #     #print(i)
-        #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+            # add waypoints found in the shortest path as sub-elements of the new agent
+            for i in shortest_path:
+                et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+
+            # for i in reversed(shortest_path):
+            #     #print(i)
+            #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+            
+            gazebo_original_pedsim_root.append(new_agent)
+        else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
+            print("Overlapping between robot initial pose and goal")
+
+            #TODO Opzione 2: genero 2 distribuzioni di probabilità per il raggio [0, r_max], e per il theta [0, 2pi]. 
+            # Per ogni pedone genero un sample nel raggio e theta, controlla e nel caso negativo ripeti
+            # Vantaggio rispetto all'opzione 1: si tratta di una distrib. uniforme invece che discreta. 
+            ped_index = 0   # index usato per la condizione del while
+            count_index = 0 # index usato per modificare il seed del sample
+            while ped_index < pedestrian_number:
+                ray = random.Random(self.run_index + count_index).uniform(0, pedestrian_max_distance)
+                theta = random.Random(self.run_index + count_index).uniform(0, 2.0 * pi)
+                print("ray sample: ", ray)
+                print("theta sample: ", theta)
+                x_sample = x_goal + ray * cos(theta)
+                y_sample = y_goal + ray * sin(theta)
+
+                sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
+                print("Sample to start distance: ", sample_to_start_dist) 
+
+                if sample_to_start_dist < pedestrian_min_distance: 
+                    print(ped_index, " Error, chosen sample is in the forbidden zone, choosing another sample..\n")
+                else: 
+                    print(ped_index, " Success, chosen sample satisfies the requirement.")
+                    # 4.3) create an agent whose xy-coordinates are those of the chosen sample
+                    x_agent, y_agent = x_sample, y_sample
+                    dx = dy = 0.0
+                    n = 1
+                    type = 10
+                    new_agent = Element('agent', attrib={'x': str(x_agent), 
+                                                        'y': str(y_agent), 
+                                                        'dx': str(dx), 
+                                                        'dy': str(dy), 
+                                                        'n': str(n), 
+                                                        'type': str(type)})
+
+                    # add waypoints found in the shortest path as sub-elements of the new agent
+                    for i in shortest_path:
+                        et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+
+                    # for i in reversed(shortest_path):
+                    #     #print(i)
+                    #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
+                    
+                    gazebo_original_pedsim_root.append(new_agent)
+                    print(new_agent.attrib)
+                    ped_index+=1
+                
+                count_index+=1
+            
+                # while not is_done:
+            #     # TODO cambia descrizione variabili "candidate_ped_pos"
+            #     pseudo_random_sample = sample_list[i % len(sample_list)]   
+            #     x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
+            #     #print("x=", x_sample, "y=", y_sample)
+            #     
+
+            #     
+            #         # remove the sample from the list
+            #         sample_list.remove(pseudo_random_sample)
+            #         i+=1
+            #     else: 
+            #         is_done = True
+            #         print("Valid sample: ", pseudo_random_sample, "\n")
+
+
+            # # generate a list of samples of the circle defined by the origin equal to goal_position and ray equal to initial_node_max_distance
+            # sample_list = list()
+            # for r in np.arange(pedestrian_max_distance/8.0, pedestrian_max_distance + pedestrian_max_distance/8.0, pedestrian_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
+            #                                                                                                                                         # Notice that arange() does not include the end, so to include it is necessary to add the increment
+            #     for theta in np.arange(0.0, 2*pi, 2*pi/16):
+            #         x = x_goal + r * cos(theta)
+            #         y = y_goal + r * sin(theta)
+            #         temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
+            #         temp_list.append(x)
+            #         temp_list.append(y)
+            #         sample_list.append(temp_list)
+                
+            # print(sample_list)
+
+            # # choose pseudocasually one sample. If it doesn't satisfies the condition, then choose another
+            # is_done = False    
+            # i = 0
+            # random.Random(0).shuffle(sample_list)
+
+            # # Opzione 1: filtra tutti i sample che non rispettano la condizione, poi scegline uno diverso per ogni agente
+            # while not is_done:
+            #     # TODO cambia descrizione variabili "candidate_ped_pos"
+            #     pseudo_random_sample = sample_list[i % len(sample_list)]   
+            #     x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
+            #     #print("x=", x_sample, "y=", y_sample)
+            #     sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
+            #     # sample_to_goal_dist = sqrt((x_sample - self.goal_pose.pose.position.x)**2 + (y_sample - self.goal_pose.pose.position.y)**2)
+            #     print("Sample to start dist: ", sample_to_start_dist) 
+
+            #     if sample_to_start_dist < pedestrian_min_distance: 
+            #         print("Error, chosen sample is in the forbidden zone, choosing another sample..\n")
+            #         # remove the sample from the list
+            #         sample_list.remove(pseudo_random_sample)
+            #         i+=1
+            #     else: 
+            #         is_done = True
+            #         print("Valid sample: ", pseudo_random_sample, "\n")
+       
+            # per il sampling: 
+            # 1) fai variare theta da 0 a 2pi, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
+            # 2) Aggiungi i punti in una lista
+            # 3) Scegli un punto pseudocasualmente
+            # 4) controlla che rispetti il requisito di distanza dal punto di initial robot pose
+
+
         
-        gazebo_original_pedsim_root.append(new_agent) 
 
 
         # write to the file in the run folder  
