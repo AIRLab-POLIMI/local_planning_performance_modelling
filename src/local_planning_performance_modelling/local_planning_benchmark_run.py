@@ -244,13 +244,13 @@ class BenchmarkRun(object):
         # copy the configuration of local_planner to the run folder and update its parameters
         with open(original_local_planner_configuration_path) as local_planner_configuration_file:
             local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
-        # if local_planner_node == 'teb':  # TODO
-        #     if robot_model == 'turtlebot3_waffle_performance_modelling':
-        #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = False
-        #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
-        #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.vertices'] = turtlebot_footprint_string
-        #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['wheelbase'] = turtlebot_wheelbase
-        #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['min_turning_radius'] = turtlebot_min_turning_radius
+        if local_planner_node == 'teb':  # TODO
+            if robot_model == 'turtlebot3_waffle_performance_modelling':
+                local_planner_configuration['cmd_angle_instead_rotvel'] = False
+                local_planner_configuration['footprint_model.type'] = "polygon"
+                local_planner_configuration['footprint_model.vertices'] = turtlebot_footprint_string
+                local_planner_configuration['wheelbase'] = turtlebot_wheelbase
+                local_planner_configuration['min_turning_radius'] = turtlebot_min_turning_radius
         #     elif robot_model == 'hunter2':
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
@@ -266,8 +266,8 @@ class BenchmarkRun(object):
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['use_rotate_to_heading'] = False
         #     else:
         #         raise ValueError()
-        # elif local_planner_node == 'dwa':
-        #     pass
+        elif local_planner_node == 'dwa':
+            pass
         # else:
         #     raise ValueError()
         if not path.exists(path.dirname(self.local_planner_configuration_path)):
@@ -284,8 +284,8 @@ class BenchmarkRun(object):
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius).copy()
-        #TODO sostituire con questo voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + pedestrian_circumscribing_radius).copy()
-        
+        # for i in voronoi_graph.nodes:
+        #     print("Voronoi graph id: ", i, "data: ", voronoi_graph.nodes[i])
         
         # Requirement 1: il pedone deve essere ad una distanza >= initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
         # The above requirement guarantees that the pedestrians will not spawn too close to the robot, 
@@ -341,6 +341,8 @@ class BenchmarkRun(object):
         maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
+        # for i in initial_node_voronoi_graph.nodes:
+        #     print("Initial node voronoi graph: ", i, "data: ", initial_node_voronoi_graph.nodes[i])
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
         # TODO controlla cosa succede in intel
         index_list = list(iterator)
@@ -351,9 +353,6 @@ class BenchmarkRun(object):
         print("before remove", index_filtered_list)
         index_filtered_list.remove(pseudo_random_voronoi_index_goal)
         print("after remove", index_filtered_list)
-
-        #TODO possibile che 2 nodi nella stessa posizione abbiano indici diversi o 2 nodi con stesso indici abbiano posizione diversi
-        # controlla che la lista di id x y del 1 voronoi graph dia lo stesso risultato di id x y del 2 voronoi graph
         
         #print("List of nodes with radius <= 3m and able to reach the goal: ", index_filtered_list)
         # for i in initial_node_voronoi_graph.nodes:
@@ -428,7 +427,7 @@ class BenchmarkRun(object):
         else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
             print("Overlapping between robot initial pose and goal")
 
-            #TODO Opzione 2: genero 2 distribuzioni di probabilità per il raggio [0, r_max], e per il theta [0, 2pi]. 
+            # Opzione 2: genero 2 distribuzioni di probabilità per il raggio [0, r_max], e per il theta [0, 2pi]. 
             # Per ogni pedone genero un sample nel raggio e theta, controlla e nel caso negativo ripeti
             # Vantaggio rispetto all'opzione 1: si tratta di una distrib. uniforme invece che discreta. 
             ped_index = 0   # index usato per la condizione del while
@@ -448,7 +447,7 @@ class BenchmarkRun(object):
                     print(ped_index, " Error, chosen sample is in the forbidden zone, choosing another sample..\n")
                 else: 
                     print(ped_index, " Success, chosen sample satisfies the requirement.")
-                    # 4.3) create an agent whose xy-coordinates are those of the chosen sample
+                    # create an agent whose xy-coordinates are those of the chosen sample
                     x_agent, y_agent = x_sample, y_sample
                     dx = dy = 0.0
                     n = 1
