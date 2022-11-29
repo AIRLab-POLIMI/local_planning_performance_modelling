@@ -8,10 +8,8 @@ Panels:
         - /TF1/Tree1
         - /planner1
         - /planner1/TEB1
-        - /planner1/TEB1/local_plan1
-        - /planner1/TEB1/Marker1
-        - /planner1/TEB1/Marker1/Status1
         - /planner1/TEB1/Marker1/Namespaces1
+        - /planner1/TEB1/poses1
       Splitter Ratio: 0.38842976093292236
     Tree Height: 2039
   - Class: rviz/Selection
@@ -425,15 +423,6 @@ Visualization Manager:
               Topic: /move_base/TebLocalPlannerROS/local_plan
               Unreliable: false
               Value: true
-            - Class: rviz/Marker
-              Enabled: true
-              Marker Topic: /move_base/TebLocalPlannerROS/teb_markers
-              Name: Marker
-              Namespaces:
-                PointObstacles: true
-                TebContainer: true
-              Queue Size: 100
-              Value: true
             - Alpha: 1
               Buffer Length: 1
               Class: rviz/Path
@@ -456,6 +445,35 @@ Visualization Manager:
               Shaft Diameter: 0.10000000149011612
               Shaft Length: 0.10000000149011612
               Topic: /move_base/TebLocalPlannerROS/global_plan
+              Unreliable: false
+              Value: true
+            - Class: rviz/Marker
+              Enabled: true
+              Marker Topic: /move_base/TebLocalPlannerROS/teb_markers
+              Name: Marker
+              Namespaces:
+                GraphEdges: true
+                GraphVertices: true
+                PointObstacles: true
+                RobotFootprintModel: true
+                TebContainer: true
+              Queue Size: 100
+              Value: true
+            - Alpha: 1
+              Arrow Length: 0.30000001192092896
+              Axes Length: 0.30000001192092896
+              Axes Radius: 0.009999999776482582
+              Class: rviz/PoseArray
+              Color: 255; 25; 0
+              Enabled: true
+              Head Length: 0.07000000029802322
+              Head Radius: 0.029999999329447746
+              Name: poses
+              Queue Size: 10
+              Shaft Length: 0.23000000417232513
+              Shaft Radius: 0.009999999776482582
+              Shape: Arrow (Flat)
+              Topic: /move_base/TebLocalPlannerROS/teb_poses
               Unreliable: false
               Value: true
           Enabled: true
@@ -486,7 +504,7 @@ Visualization Manager:
               Topic: /move_base/DWAPlannerROS/local_plan
               Unreliable: false
               Value: true
-          Enabled: true
+          Enabled: false
           Name: DWA
         - Class: rviz/Group
           Displays:
@@ -530,7 +548,7 @@ Visualization Manager:
               Topic: /vis_global_path
               Unreliable: false
               Value: true
-          Enabled: true
+          Enabled: false
           Name: ARENA
       Enabled: true
       Name: planner
@@ -571,7 +589,7 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 248.52334594726562
+      Scale: 163.6154022216797
       Target Frame: <Fixed Frame>
       X: -2.457874059677124
       Y: 0.562512218952179
