@@ -65,7 +65,7 @@ class LocalPlanningBenchmarkSupervisor:
     def __init__(self):
 
         # Debug variable
-        self.prevent_shutdown = False  # Should be False, unless you are currently debugging. if True, runs will never end.
+        self.prevent_shutdown = True  # Should be False, unless you are currently debugging. if True, runs will never end.
 
         # topics, services, actions, entities and frames names
         scan_topic = rospy.get_param('~scan_topic')

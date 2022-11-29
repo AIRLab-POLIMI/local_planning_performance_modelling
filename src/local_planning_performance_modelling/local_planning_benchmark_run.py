@@ -66,8 +66,8 @@ class BenchmarkRun(object):
         self.localization_node = self.run_parameters['localization_node']
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
-        max_steering_angle_deg = self.run_parameters['max_steering_angle_deg'] if 'max_steering_angle_deg' in self.run_parameters else None
-        max_steering_rad = (max_steering_angle_deg/180.0) * np.pi if 'max_steering_angle_deg' in self.run_parameters else None
+        min_turning_radius = self.run_parameters['min_turning_radius'] if 'min_turning_radius' in self.run_parameters else None
+        
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
         pedestrian_number = self.run_parameters['pedestrian_number']
 
@@ -95,16 +95,17 @@ class BenchmarkRun(object):
         else:
             raise ValueError()
 
-        hunter2_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
-        hunter2_min_turning_radius = float(hunter2_wheelbase/np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
-        hunter2_footprint = self.benchmark_configuration['hunter2_footprint']
-        hunter2_footprint_string = str(hunter2_footprint)
-
-        #TODO Warning: se usiamo un global/local planner (TEB) con primitive e min_turning_radius allora cambia queste righe
-        turtlebot_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
-        turtlebot_min_turning_radius = float(hunter2_wheelbase / np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
+        # hunter2_wheelbase = self.benchmark_configuration['hunter2_wheelbase']
+        # # calcolo il max steering angle se viene usato hunter
+        # hunter2_footprint = self.benchmark_configuration['hunter2_footprint']
+        # hunter2_footprint_string = str(hunter2_footprint)
+        
+        turtlebot_wheelbase = self.benchmark_configuration['turtlebot_wheelbase']
+        #min_turning_radius = float(hunter2_wheelbase / np.tan(max_steering_rad)) if 'max_steering_angle_deg' in self.run_parameters else None
         turtlebot_footprint = self.benchmark_configuration['turtlebot_footprint']
         turtlebot_footprint_string = str(turtlebot_footprint)
+        #TODO cerca perchè con min_turn_radius = 0 TEB non performa benissimo
+        # turtlebot non ha un max_steering_angle ma ha un min_turn_radius = 0. Vale la pena provare valori piccoli vicino allo 0 (0.1cm) di min_turn_radius per mostrare che TEB funzioni meglio.
 
         #max_circumscribing_circle_radius = max(float(np.max(np.fabs(np.array(turtlebot_footprint)))),
         #                                       float(np.max(np.fabs(np.array(hunter2_footprint)))))  # largest radius for any robot's circumscribing circle
@@ -116,8 +117,8 @@ class BenchmarkRun(object):
 
         if robot_model == 'turtlebot3_waffle_performance_modelling':
             robot_drive_plugin_type = 'diff_drive_plugin'
-        elif robot_model == 'hunter2':
-            robot_drive_plugin_type = 'ackermann_drive_plugin'
+        # elif robot_model == 'hunter2':
+        #     robot_drive_plugin_type = 'ackermann_drive_plugin'
         else:
             raise ValueError()
             
@@ -196,17 +197,6 @@ class BenchmarkRun(object):
         with open(self.supervisor_configuration_path, 'w') as supervisor_configuration_file:
             yaml.dump(supervisor_configuration, supervisor_configuration_file, default_flow_style=False)
 
-        # get the robot position from gazebo_environment.model (starting position is different according to each environment)
-            # gazebo_original_world_model_tree = et.parse(original_gazebo_world_model_path)
-            # gazebo_original_world_model_root = gazebo_original_world_model_tree.getroot()
-            # pose_string = gazebo_original_world_model_root.findall(".//include[@include_id='robot_model']/pose")[0].text
-            # pose_string = pose_string.split(' ')
-            # robot_initial_pose_x = float(pose_string[0])
-            # robot_initial_pose_y = float(pose_string[1])
-            # robot_initial_pose_theta = float(pose_string[5])
-
-            #print("Robot initial pose -> x: " + str(robot_initial_pose_x), " y: " + str(robot_initial_pose_y), " theta(radians): " + str(robot_initial_pose_theta))
-
         # copy the configuration of the navigation_stack to the run folder and update its parameters
         with open(original_navigation_stack_configuration_path) as navigation_stack_configuration_file:
             navigation_stack_configuration = yaml.safe_load(navigation_stack_configuration_file)
@@ -216,9 +206,9 @@ class BenchmarkRun(object):
             navigation_stack_configuration['global_costmap']['footprint'] = turtlebot_footprint_string
             #print(navigation_stack_configuration['local_costmap']['footprint'])
             #print(navigation_stack_configuration_file)
-        elif robot_model == 'hunter2':
-            navigation_stack_configuration['local_costmap']['footprint'] = hunter2_footprint_string
-            navigation_stack_configuration['global_costmap']['footprint'] = hunter2_footprint_string
+        # elif robot_model == 'hunter2':
+        #     navigation_stack_configuration['local_costmap']['footprint'] = hunter2_footprint_string
+        #     navigation_stack_configuration['global_costmap']['footprint'] = hunter2_footprint_string
         else:
             raise ValueError()
         if not path.exists(path.dirname(self.navigation_stack_configuration_path)):
@@ -246,11 +236,12 @@ class BenchmarkRun(object):
             local_planner_configuration = yaml.safe_load(local_planner_configuration_file)
         if local_planner_node == 'teb':  # TODO
             if robot_model == 'turtlebot3_waffle_performance_modelling':
-                local_planner_configuration['cmd_angle_instead_rotvel'] = False
-                local_planner_configuration['footprint_model.type'] = "polygon"
-                local_planner_configuration['footprint_model.vertices'] = turtlebot_footprint_string
-                local_planner_configuration['wheelbase'] = turtlebot_wheelbase
-                local_planner_configuration['min_turning_radius'] = turtlebot_min_turning_radius
+                local_planner_configuration['TebLocalPlannerROS']['cmd_angle_instead_rotvel'] = False
+                local_planner_configuration['TebLocalPlannerROS']['footprint_model'] = {'type': None, 'vertices': None}
+                local_planner_configuration['TebLocalPlannerROS']['footprint_model']['type'] = "polygon"
+                local_planner_configuration['TebLocalPlannerROS']['footprint_model']['vertices'] = turtlebot_footprint      # TEB does not accept the footprint in the form of a string
+                local_planner_configuration['TebLocalPlannerROS']['wheelbase'] = turtlebot_wheelbase
+                local_planner_configuration['TebLocalPlannerROS']['min_turning_radius'] = min_turning_radius
         #     elif robot_model == 'hunter2':
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
@@ -284,8 +275,6 @@ class BenchmarkRun(object):
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius).copy()
-        # for i in voronoi_graph.nodes:
-        #     print("Voronoi graph id: ", i, "data: ", voronoi_graph.nodes[i])
         
         # Requirement 1: il pedone deve essere ad una distanza >= initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
         # The above requirement guarantees that the pedestrians will not spawn too close to the robot, 
@@ -310,7 +299,8 @@ class BenchmarkRun(object):
 
         # 1.2) select the goal node pseudo-randomly using the run number
         # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
-        nil = copy.copy(list(voronoi_graph.nodes))  # list of the indices of the nodes in voronoi_graph.nodes
+        nil = copy.copy(list(voronoi_graph.nodes))  
+        print("Possible goals: ", nil)
         random.Random(0).shuffle(nil)
         pseudo_random_voronoi_index_goal = nil[self.run_index % len(nil)]
         print("goal index: ", pseudo_random_voronoi_index_goal)
@@ -341,22 +331,17 @@ class BenchmarkRun(object):
         maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
-        # for i in initial_node_voronoi_graph.nodes:
-        #     print("Initial node voronoi graph: ", i, "data: ", initial_node_voronoi_graph.nodes[i])
+        # consider only those nodes whose radius is less or equal than 3 meters
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
         # TODO controlla cosa succede in intel
         index_list = list(iterator)
         print("List of nodes with radius <= 3m: ", index_list)
-        # turn the integer obtained from the list into a set and then check if it is subset of the goal connected component
+        # consider only those nodes which are in the goal connected component, so that we can guarantee there is a shortest path between start and goal 
         filtered = filter(lambda l: l in goal_connected_component, index_list)
         index_filtered_list = list(filtered)
         print("before remove", index_filtered_list)
         index_filtered_list.remove(pseudo_random_voronoi_index_goal)
         print("after remove", index_filtered_list)
-        
-        #print("List of nodes with radius <= 3m and able to reach the goal: ", index_filtered_list)
-        # for i in initial_node_voronoi_graph.nodes:
-        #     print("Radius of node ", i, " = ", initial_node_voronoi_graph.nodes[i]['radius'])
         
         index_list_copy = copy.copy(index_filtered_list)  # list of the indices of the nodes in index_list
         random.Random(1).shuffle(index_list_copy)
@@ -418,10 +403,6 @@ class BenchmarkRun(object):
             # add waypoints found in the shortest path as sub-elements of the new agent
             for i in shortest_path:
                 et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
-
-            # for i in reversed(shortest_path):
-            #     #print(i)
-            #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
             
             gazebo_original_pedsim_root.append(new_agent)
         else: # Case 2: there is overlapping. Sample and choose x, y such that they don't belong to the forbidden zone around the robot initial position.
@@ -430,18 +411,16 @@ class BenchmarkRun(object):
             # Opzione 2: genero 2 distribuzioni di probabilità per il raggio [0, r_max], e per il theta [0, 2pi]. 
             # Per ogni pedone genero un sample nel raggio e theta, controlla e nel caso negativo ripeti
             # Vantaggio rispetto all'opzione 1: si tratta di una distrib. uniforme invece che discreta. 
+            #TODO commenta e spiega meglio
             ped_index = 0   # index usato per la condizione del while
             count_index = 0 # index usato per modificare il seed del sample
             while ped_index < pedestrian_number:
                 ray = random.Random(self.run_index + count_index).uniform(0, pedestrian_max_distance)
                 theta = random.Random(self.run_index + count_index).uniform(0, 2.0 * pi)
-                print("ray sample: ", ray)
-                print("theta sample: ", theta)
                 x_sample = x_goal + ray * cos(theta)
                 y_sample = y_goal + ray * sin(theta)
 
                 sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
-                print("Sample to start distance: ", sample_to_start_dist) 
 
                 if sample_to_start_dist < pedestrian_min_distance: 
                     print(ped_index, " Error, chosen sample is in the forbidden zone, choosing another sample..\n")
@@ -462,80 +441,11 @@ class BenchmarkRun(object):
                     # add waypoints found in the shortest path as sub-elements of the new agent
                     for i in shortest_path:
                         et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
-
-                    # for i in reversed(shortest_path):
-                    #     #print(i)
-                    #     et.SubElement(new_agent, 'addwaypoint', attrib = {'id': 'waypoint_id_' + str(i)})
                     
                     gazebo_original_pedsim_root.append(new_agent)
-                    print(new_agent.attrib)
                     ped_index+=1
                 
                 count_index+=1
-            
-                # while not is_done:
-            #     # TODO cambia descrizione variabili "candidate_ped_pos"
-            #     pseudo_random_sample = sample_list[i % len(sample_list)]   
-            #     x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
-            #     #print("x=", x_sample, "y=", y_sample)
-            #     
-
-            #     
-            #         # remove the sample from the list
-            #         sample_list.remove(pseudo_random_sample)
-            #         i+=1
-            #     else: 
-            #         is_done = True
-            #         print("Valid sample: ", pseudo_random_sample, "\n")
-
-
-            # # generate a list of samples of the circle defined by the origin equal to goal_position and ray equal to initial_node_max_distance
-            # sample_list = list()
-            # for r in np.arange(pedestrian_max_distance/8.0, pedestrian_max_distance + pedestrian_max_distance/8.0, pedestrian_max_distance/8.0):    # range(start, end, increment), start directly from the first level of increment instead of 0.0, ohterwise it samples [0, 0] multiple times 
-            #                                                                                                                                         # Notice that arange() does not include the end, so to include it is necessary to add the increment
-            #     for theta in np.arange(0.0, 2*pi, 2*pi/16):
-            #         x = x_goal + r * cos(theta)
-            #         y = y_goal + r * sin(theta)
-            #         temp_list = list()  # this list is used to store a single [x, y] couple which will be appended to the main one at each iteration of this inner loop (basically adding a [x, y] list everytime)
-            #         temp_list.append(x)
-            #         temp_list.append(y)
-            #         sample_list.append(temp_list)
-                
-            # print(sample_list)
-
-            # # choose pseudocasually one sample. If it doesn't satisfies the condition, then choose another
-            # is_done = False    
-            # i = 0
-            # random.Random(0).shuffle(sample_list)
-
-            # # Opzione 1: filtra tutti i sample che non rispettano la condizione, poi scegline uno diverso per ogni agente
-            # while not is_done:
-            #     # TODO cambia descrizione variabili "candidate_ped_pos"
-            #     pseudo_random_sample = sample_list[i % len(sample_list)]   
-            #     x_sample, y_sample = pseudo_random_sample[0], pseudo_random_sample[1]
-            #     #print("x=", x_sample, "y=", y_sample)
-            #     sample_to_start_dist = sqrt((x_sample - robot_initial_pose_x)**2 + (y_sample - robot_initial_pose_y)**2)
-            #     # sample_to_goal_dist = sqrt((x_sample - self.goal_pose.pose.position.x)**2 + (y_sample - self.goal_pose.pose.position.y)**2)
-            #     print("Sample to start dist: ", sample_to_start_dist) 
-
-            #     if sample_to_start_dist < pedestrian_min_distance: 
-            #         print("Error, chosen sample is in the forbidden zone, choosing another sample..\n")
-            #         # remove the sample from the list
-            #         sample_list.remove(pseudo_random_sample)
-            #         i+=1
-            #     else: 
-            #         is_done = True
-            #         print("Valid sample: ", pseudo_random_sample, "\n")
-       
-            # per il sampling: 
-            # 1) fai variare theta da 0 a 2pi, r tra 0 e r_max. Controlla la distanza euclidea dall'origine di start_pose. Se >= del raggio, allora accetta le coordinate.
-            # 2) Aggiungi i punti in una lista
-            # 3) Scegli un punto pseudocasualmente
-            # 4) controlla che rispetti il requisito di distanza dal punto di initial robot pose
-
-
-        
-
 
         # write to the file in the run folder  
         gazebo_original_pedsim_tree.write(self.pedsim_config_path)
@@ -594,8 +504,8 @@ class BenchmarkRun(object):
             gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha3".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_3)
             gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/alpha4".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(alpha_4)
 
-        if robot_model == 'hunter2':
-            gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/maxSteer".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(max_steering_rad*1.1)
+        # if robot_model == 'hunter2':
+        #     gazebo_robot_model_sdf_root.findall(".//plugin[@name='{robot_drive_plugin_type}']/maxSteer".format(robot_drive_plugin_type=robot_drive_plugin_type))[0].text = str(max_steering_rad*1.1)
         if not path.exists(path.dirname(gazebo_robot_model_sdf_path)):
             os.makedirs(path.dirname(gazebo_robot_model_sdf_path))
         gazebo_robot_model_sdf_tree.write(gazebo_robot_model_sdf_path)
