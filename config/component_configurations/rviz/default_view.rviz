@@ -6,10 +6,13 @@ Panels:
       Expanded:
         - /TF1/Frames1
         - /TF1/Tree1
+        - /pedsim1
+        - /pedsim1/TrackedPersons1
         - /planner1
-        - /planner1/TEB1
         - /planner1/TEB1/Marker1/Namespaces1
         - /planner1/TEB1/poses1
+        - /planner1/ARENA1
+        - /planner1/ARENA1/Pose1
       Splitter Ratio: 0.38842976093292236
     Tree Height: 2039
   - Class: rviz/Selection
@@ -288,7 +291,7 @@ Visualization Manager:
             Line width: 0.10000000149011612
             Value: true
           Render detection IDs: false
-          Render history: true
+          Render history: false
           Render person visual: true
           Render track IDs: true
           Render track state: false
@@ -347,7 +350,7 @@ Visualization Manager:
           Marker Topic: /pedsim_visualizer/walls
           Name: Marker
           Namespaces:
-            {}
+            "": true
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -355,7 +358,135 @@ Visualization Manager:
           Marker Topic: /pedsim_visualizer/waypoints
           Name: MarkerArray
           Namespaces:
-            {}
+            waypoint_id_1079: true
+            waypoint_id_1089: true
+            waypoint_id_1151: true
+            waypoint_id_1166: true
+            waypoint_id_1168: true
+            waypoint_id_118: true
+            waypoint_id_1207: true
+            waypoint_id_1247: true
+            waypoint_id_125: true
+            waypoint_id_1308: true
+            waypoint_id_1319: true
+            waypoint_id_1357: true
+            waypoint_id_1362: true
+            waypoint_id_13782: true
+            waypoint_id_139: true
+            waypoint_id_14051: true
+            waypoint_id_150: true
+            waypoint_id_1525: true
+            waypoint_id_1541: true
+            waypoint_id_1638: true
+            waypoint_id_1661: true
+            waypoint_id_1790: true
+            waypoint_id_18: true
+            waypoint_id_1805: true
+            waypoint_id_1840: true
+            waypoint_id_1875: true
+            waypoint_id_195: true
+            waypoint_id_201: true
+            waypoint_id_2016: true
+            waypoint_id_2134: true
+            waypoint_id_22146: true
+            waypoint_id_22678: true
+            waypoint_id_2301: true
+            waypoint_id_2307: true
+            waypoint_id_2317: true
+            waypoint_id_2358: true
+            waypoint_id_2372: true
+            waypoint_id_2374: true
+            waypoint_id_24680: true
+            waypoint_id_24829: true
+            waypoint_id_25765: true
+            waypoint_id_2682: true
+            waypoint_id_2842: true
+            waypoint_id_2849: true
+            waypoint_id_2884: true
+            waypoint_id_291: true
+            waypoint_id_2929: true
+            waypoint_id_29587: true
+            waypoint_id_3015: true
+            waypoint_id_3060: true
+            waypoint_id_3088: true
+            waypoint_id_3129: true
+            waypoint_id_3171: true
+            waypoint_id_3218: true
+            waypoint_id_326: true
+            waypoint_id_3262: true
+            waypoint_id_3272: true
+            waypoint_id_3310: true
+            waypoint_id_3313: true
+            waypoint_id_333: true
+            waypoint_id_3374: true
+            waypoint_id_3384: true
+            waypoint_id_3391: true
+            waypoint_id_3513: true
+            waypoint_id_3573: true
+            waypoint_id_3581: true
+            waypoint_id_3587: true
+            waypoint_id_3672: true
+            waypoint_id_3678: true
+            waypoint_id_3713: true
+            waypoint_id_3728: true
+            waypoint_id_3739: true
+            waypoint_id_379: true
+            waypoint_id_3939: true
+            waypoint_id_4: true
+            waypoint_id_4023: true
+            waypoint_id_4143: true
+            waypoint_id_4144: true
+            waypoint_id_4266: true
+            waypoint_id_4300: true
+            waypoint_id_4423: true
+            waypoint_id_4434: true
+            waypoint_id_4449: true
+            waypoint_id_4525: true
+            waypoint_id_4549: true
+            waypoint_id_46: true
+            waypoint_id_4648: true
+            waypoint_id_4655: true
+            waypoint_id_474: true
+            waypoint_id_4783: true
+            waypoint_id_4856: true
+            waypoint_id_4893: true
+            waypoint_id_4904: true
+            waypoint_id_4917: true
+            waypoint_id_4981: true
+            waypoint_id_5001: true
+            waypoint_id_5093: true
+            waypoint_id_5121: true
+            waypoint_id_5139: true
+            waypoint_id_52: true
+            waypoint_id_5200: true
+            waypoint_id_5227: true
+            waypoint_id_5278: true
+            waypoint_id_5283: true
+            waypoint_id_5316: true
+            waypoint_id_5357: true
+            waypoint_id_5413: true
+            waypoint_id_5441: true
+            waypoint_id_5709: true
+            waypoint_id_5746: true
+            waypoint_id_5834: true
+            waypoint_id_5980: true
+            waypoint_id_603: true
+            waypoint_id_6035: true
+            waypoint_id_6053: true
+            waypoint_id_6124: true
+            waypoint_id_6198: true
+            waypoint_id_623: true
+            waypoint_id_6291: true
+            waypoint_id_6513: true
+            waypoint_id_655: true
+            waypoint_id_765: true
+            waypoint_id_828: true
+            waypoint_id_853: true
+            waypoint_id_8814: true
+            waypoint_id_9: true
+            waypoint_id_954: true
+            waypoint_id_97: true
+            waypoint_id_984: true
           Queue Size: 100
           Value: true
         - Angle Tolerance: 0.10000000149011612
@@ -375,7 +506,7 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: true
-          Enabled: true
+          Enabled: false
           Keep: 100
           Name: Odometry
           Position Tolerance: 0.10000000149011612
@@ -392,7 +523,7 @@ Visualization Manager:
             Value: Arrow
           Topic: /pedsim_simulator/robot_position
           Unreliable: false
-          Value: true
+          Value: false
       Enabled: true
       Name: pedsim
     - Class: rviz/Group
@@ -452,11 +583,7 @@ Visualization Manager:
               Marker Topic: /move_base/TebLocalPlannerROS/teb_markers
               Name: Marker
               Namespaces:
-                GraphEdges: true
-                GraphVertices: true
-                PointObstacles: true
-                RobotFootprintModel: true
-                TebContainer: true
+                {}
               Queue Size: 100
               Value: true
             - Alpha: 1
@@ -476,7 +603,7 @@ Visualization Manager:
               Topic: /move_base/TebLocalPlannerROS/teb_poses
               Unreliable: false
               Value: true
-          Enabled: true
+          Enabled: false
           Name: TEB
         - Class: rviz/Group
           Displays:
@@ -548,7 +675,23 @@ Visualization Manager:
               Topic: /vis_global_path
               Unreliable: false
               Value: true
-          Enabled: false
+            - Alpha: 1
+              Axes Length: 1
+              Axes Radius: 0.10000000149011612
+              Class: rviz/Pose
+              Color: 255; 25; 0
+              Enabled: true
+              Head Length: 0.30000001192092896
+              Head Radius: 0.10000000149011612
+              Name: goal
+              Queue Size: 10
+              Shaft Length: 1
+              Shaft Radius: 0.05000000074505806
+              Shape: Arrow
+              Topic: /goal
+              Unreliable: false
+              Value: true
+          Enabled: true
           Name: ARENA
       Enabled: true
       Name: planner
@@ -579,7 +722,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0
+      Angle: -0.014999807812273502
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -589,10 +732,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 163.6154022216797
+      Scale: 26.851337432861328
       Target Frame: <Fixed Frame>
-      X: -2.457874059677124
-      Y: 0.562512218952179
+      X: 8.086255073547363
+      Y: -4.025691986083984
     Saved: ~
 Window Geometry:
   Displays:

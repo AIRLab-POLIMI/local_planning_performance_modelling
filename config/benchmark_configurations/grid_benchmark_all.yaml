@@ -17,7 +17,7 @@ combinatorial_parameters: [
   #   run_replication_index: *id003,
   #   environment_name: *id002,
   #   pedestrian_number: [0],
-  #   pedestrian_max_vel: [0.3], # ha senso solo per pedestrian_number > 0
+  #   pedestrian_max_vel: [0.3], 
   #   min_turning_radius: [0.0, 0.1]
   # },
   {
@@ -32,7 +32,7 @@ combinatorial_parameters: [
     run_replication_index: *id003,
     environment_name: *id002,
     pedestrian_number: [0],
-    pedestrian_max_vel: [0.3], # ha senso solo per pedestrian_number > 0
+    pedestrian_max_vel: [0.3],
     min_turning_radius: [0.0, 0.1]
   },
 ]
