@@ -2,7 +2,7 @@
 initial_pose_std_xy: 0.2
 initial_pose_std_theta: 0.2617
 goal_tolerance: 0.4
-run_timeout: 600.0
+run_timeout: 300.0
 ps_snapshot_period: 1.0
 write_estimated_poses_period: 0.1
 

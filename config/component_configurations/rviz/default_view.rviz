@@ -4,9 +4,9 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /TF1
         - /TF1/Frames1
         - /TF1/Tree1
-        - /pedsim1
         - /pedsim1/TrackedPersons1
         - /planner1
         - /planner1/TEB1/Marker1/Namespaces1
@@ -732,10 +732,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 26.851337432861328
+      Scale: 129.3358612060547
       Target Frame: <Fixed Frame>
-      X: 8.086255073547363
-      Y: -4.025691986083984
+      X: 2.364129066467285
+      Y: -20.899185180664062
     Saved: ~
 Window Geometry:
   Displays:
@@ -753,5 +753,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 3598
-  X: 144
-  Y: 54
+  X: 958
+  Y: 105
