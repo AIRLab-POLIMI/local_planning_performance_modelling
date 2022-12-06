@@ -237,9 +237,7 @@ class BenchmarkRun(object):
         if local_planner_node == 'teb':  # TODO
             if robot_model == 'turtlebot3_waffle_performance_modelling':
                 local_planner_configuration['TebLocalPlannerROS']['cmd_angle_instead_rotvel'] = False
-                local_planner_configuration['TebLocalPlannerROS']['footprint_model'] = {'type': None, 'vertices': None}
-                local_planner_configuration['TebLocalPlannerROS']['footprint_model']['type'] = "polygon"
-                local_planner_configuration['TebLocalPlannerROS']['footprint_model']['vertices'] = turtlebot_footprint      # TEB does not accept the footprint in the form of a string
+                local_planner_configuration['TebLocalPlannerROS']['footprint_model'] = {'type': "polygon", 'vertices': turtlebot_footprint}  # TEB does not accept the footprint in the form of a string 
                 local_planner_configuration['TebLocalPlannerROS']['wheelbase'] = turtlebot_wheelbase
                 local_planner_configuration['TebLocalPlannerROS']['min_turning_radius'] = min_turning_radius
         #     elif robot_model == 'hunter2':
@@ -370,6 +368,7 @@ class BenchmarkRun(object):
         print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
         print(shortest_path)
+        # self.ground_truth_map.save_voronoi_plot("/home/emanuele/temp/voronoi.svg", graph=voronoi_graph, min_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius)
 
         # 4.2) prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
         
