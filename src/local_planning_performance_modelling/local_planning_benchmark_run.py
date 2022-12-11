@@ -610,6 +610,14 @@ class BenchmarkRun(object):
                         'map': self.map_info_file_path,
                         'log_path': self.ros_log_directory,
             })
+        elif local_planner_node == 'gring':
+            navigation_gring = Component('navigation_gring', 'local_planning_performance_modelling', 'navigation_gring.launch', {
+                        'local_planner_params_file': self.local_planner_configuration_path,
+                        'global_planner_params_file': self.global_planner_configuration_path,
+                        'nav_params_file': self.navigation_stack_configuration_path,
+                        'map': self.map_info_file_path,
+                        'log_path': self.ros_log_directory,
+            })
         else:
             navigation = Component('navigation', 'local_planning_performance_modelling', 'navigation.launch', {
                         'local_planner_params_file': self.local_planner_configuration_path,
@@ -643,6 +651,8 @@ class BenchmarkRun(object):
         localization.launch()
         if local_planner_node == 'arena':
             navigation_arena.launch()
+        elif local_planner_node == 'gring':
+            navigation_gring.launch()
         else: 
             navigation.launch()
         supervisor.launch()
@@ -661,6 +671,8 @@ class BenchmarkRun(object):
         supervisor.shutdown()
         if local_planner_node == 'arena':
             navigation_arena.shutdown()
+        elif local_planner_node == 'gring':
+            navigation_gring.shutdown()
         else: 
             navigation.shutdown()
         localization.shutdown()
