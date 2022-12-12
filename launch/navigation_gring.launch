@@ -29,5 +29,26 @@
         output="$(arg output)">
     </node>
 
+
+    <!-- RL infrastructure -->
+        <node pkg="rl_agent" type="laser_scan_merger" name="laser_scan_merger" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+        
+        <node pkg="rl_local_planner" type="image_generator" name="image_generator" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+        <node pkg="rl_local_planner" type="wp_generator" name="wp_generator" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+    <!-- DRL node using PPO2 for simulation (no training) -->
+    <node pkg="rl_agent" type="run_ppo.py" name="run_ppo" output="screen" args="ppo2_1_img_disc_0 CnnPolicy 1 1 0 1 ped 1" />    
+
 </launch>
 
