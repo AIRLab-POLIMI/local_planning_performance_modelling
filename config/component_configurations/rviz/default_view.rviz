@@ -11,7 +11,7 @@ Panels:
         - /planner1
         - /planner1/TEB1/Marker1/Namespaces1
         - /planner1/TEB1/poses1
-        - /planner1/ARENA1
+        - /planner1/DWA1
         - /planner1/ARENA1/Pose1
       Splitter Ratio: 0.38842976093292236
     Tree Height: 2240
@@ -358,136 +358,108 @@ Visualization Manager:
           Marker Topic: /pedsim_visualizer/waypoints
           Name: MarkerArray
           Namespaces:
-            waypoint_id_10: true
-            waypoint_id_1012: true
-            waypoint_id_1057: true
-            waypoint_id_10948: true
-            waypoint_id_1114: true
-            waypoint_id_1118: true
-            waypoint_id_115: true
-            waypoint_id_116: true
-            waypoint_id_1261: true
-            waypoint_id_1281: true
-            waypoint_id_1361: true
-            waypoint_id_1473: true
-            waypoint_id_1497: true
-            waypoint_id_1503: true
-            waypoint_id_154: true
-            waypoint_id_1558: true
-            waypoint_id_1668: true
+            waypoint_id_1064: true
+            waypoint_id_1084: true
+            waypoint_id_1137: true
+            waypoint_id_1161: true
+            waypoint_id_1222: true
+            waypoint_id_123: true
+            waypoint_id_1260: true
+            waypoint_id_1406: true
+            waypoint_id_1469: true
+            waypoint_id_1607: true
+            waypoint_id_1617: true
+            waypoint_id_1649: true
+            waypoint_id_1650: true
+            waypoint_id_16535: true
             waypoint_id_1691: true
-            waypoint_id_1747: true
-            waypoint_id_17676: true
-            waypoint_id_1841: true
-            waypoint_id_1933: true
-            waypoint_id_1959: true
-            waypoint_id_20251: true
-            waypoint_id_2033: true
-            waypoint_id_2061: true
-            waypoint_id_2103: true
-            waypoint_id_2155: true
-            waypoint_id_22: true
-            waypoint_id_2238: true
-            waypoint_id_2259: true
-            waypoint_id_2280: true
-            waypoint_id_2320: true
-            waypoint_id_23451: true
-            waypoint_id_236: true
-            waypoint_id_2372: true
-            waypoint_id_24: true
-            waypoint_id_2523: true
-            waypoint_id_26250: true
-            waypoint_id_26972: true
-            waypoint_id_270: true
-            waypoint_id_2736: true
-            waypoint_id_2744: true
-            waypoint_id_284: true
-            waypoint_id_285: true
-            waypoint_id_286: true
-            waypoint_id_2892: true
-            waypoint_id_3003: true
-            waypoint_id_3014: true
-            waypoint_id_3074: true
-            waypoint_id_3156: true
-            waypoint_id_3168: true
-            waypoint_id_3196: true
-            waypoint_id_3220: true
-            waypoint_id_3316: true
-            waypoint_id_3393: true
-            waypoint_id_3474: true
-            waypoint_id_3569: true
-            waypoint_id_3619: true
-            waypoint_id_3656: true
-            waypoint_id_3757: true
-            waypoint_id_3805: true
-            waypoint_id_3814: true
-            waypoint_id_3816: true
-            waypoint_id_389: true
-            waypoint_id_393: true
-            waypoint_id_394: true
-            waypoint_id_3952: true
-            waypoint_id_3960: true
-            waypoint_id_3993: true
-            waypoint_id_4009: true
-            waypoint_id_4038: true
-            waypoint_id_4041: true
-            waypoint_id_415: true
-            waypoint_id_4186: true
-            waypoint_id_4190: true
-            waypoint_id_4250: true
-            waypoint_id_427: true
-            waypoint_id_43: true
-            waypoint_id_432: true
-            waypoint_id_4411: true
-            waypoint_id_4414: true
-            waypoint_id_4433: true
-            waypoint_id_4501: true
-            waypoint_id_4526: true
-            waypoint_id_4583: true
-            waypoint_id_4604: true
-            waypoint_id_4617: true
-            waypoint_id_4670: true
-            waypoint_id_4679: true
-            waypoint_id_4747: true
-            waypoint_id_4768: true
-            waypoint_id_4786: true
-            waypoint_id_4851: true
-            waypoint_id_5061: true
-            waypoint_id_5068: true
-            waypoint_id_5163: true
-            waypoint_id_5179: true
-            waypoint_id_5198: true
-            waypoint_id_5415: true
-            waypoint_id_5421: true
-            waypoint_id_5635: true
-            waypoint_id_569: true
-            waypoint_id_5728: true
-            waypoint_id_5733: true
-            waypoint_id_5744: true
-            waypoint_id_5749: true
-            waypoint_id_5892: true
-            waypoint_id_5913: true
-            waypoint_id_5942: true
-            waypoint_id_5944: true
-            waypoint_id_6030: true
-            waypoint_id_6147: true
-            waypoint_id_6164: true
-            waypoint_id_6330: true
-            waypoint_id_6474: true
-            waypoint_id_6596: true
-            waypoint_id_6634: true
-            waypoint_id_6650: true
-            waypoint_id_673: true
-            waypoint_id_6803: true
-            waypoint_id_7131: true
-            waypoint_id_725: true
-            waypoint_id_73: true
-            waypoint_id_7688: true
-            waypoint_id_79: true
-            waypoint_id_805: true
-            waypoint_id_840: true
-            waypoint_id_87: true
-            waypoint_id_902: true
+            waypoint_id_1707: true
+            waypoint_id_1719: true
+            waypoint_id_1744: true
+            waypoint_id_1778: true
+            waypoint_id_1826: true
+            waypoint_id_1839: true
+            waypoint_id_1934: true
+            waypoint_id_2: true
+            waypoint_id_20808: true
+            waypoint_id_20889: true
+            waypoint_id_2121: true
+            waypoint_id_21816: true
+            waypoint_id_228: true
+            waypoint_id_2305: true
+            waypoint_id_23388: true
+            waypoint_id_2368: true
+            waypoint_id_242: true
+            waypoint_id_2451: true
+            waypoint_id_2459: true
+            waypoint_id_2460: true
+            waypoint_id_25024: true
+            waypoint_id_25334: true
+            waypoint_id_2576: true
+            waypoint_id_2658: true
+            waypoint_id_2664: true
+            waypoint_id_2681: true
+            waypoint_id_2746: true
+            waypoint_id_27958: true
+            waypoint_id_2830: true
+            waypoint_id_2856: true
+            waypoint_id_2860: true
+            waypoint_id_2863: true
+            waypoint_id_2903: true
+            waypoint_id_3: true
+            waypoint_id_3037: true
+            waypoint_id_319: true
+            waypoint_id_32: true
+            waypoint_id_3228: true
+            waypoint_id_3233: true
+            waypoint_id_3263: true
+            waypoint_id_332: true
+            waypoint_id_3320: true
+            waypoint_id_345: true
+            waypoint_id_3552: true
+            waypoint_id_3578: true
+            waypoint_id_3598: true
+            waypoint_id_36: true
+            waypoint_id_374: true
+            waypoint_id_3788: true
+            waypoint_id_3796: true
+            waypoint_id_3945: true
+            waypoint_id_3948: true
+            waypoint_id_3953: true
+            waypoint_id_3967: true
+            waypoint_id_397: true
+            waypoint_id_3984: true
+            waypoint_id_3989: true
+            waypoint_id_4: true
+            waypoint_id_4199: true
+            waypoint_id_42: true
+            waypoint_id_4206: true
+            waypoint_id_4211: true
+            waypoint_id_4218: true
+            waypoint_id_4301: true
+            waypoint_id_437: true
+            waypoint_id_4469: true
+            waypoint_id_4505: true
+            waypoint_id_4550: true
+            waypoint_id_4561: true
+            waypoint_id_4633: true
+            waypoint_id_466: true
+            waypoint_id_468: true
+            waypoint_id_4699: true
+            waypoint_id_4766: true
+            waypoint_id_4894: true
+            waypoint_id_498: true
+            waypoint_id_5: true
+            waypoint_id_56: true
+            waypoint_id_58: true
+            waypoint_id_63: true
+            waypoint_id_653: true
+            waypoint_id_67: true
+            waypoint_id_691: true
+            waypoint_id_692: true
+            waypoint_id_891: true
+            waypoint_id_96: true
+            waypoint_id_989: true
           Queue Size: 100
           Value: true
         - Angle Tolerance: 0.10000000149011612
@@ -632,7 +604,31 @@ Visualization Manager:
               Topic: /move_base/DWAPlannerROS/local_plan
               Unreliable: false
               Value: true
-          Enabled: false
+            - Alpha: 1
+              Buffer Length: 1
+              Class: rviz/Path
+              Color: 25; 255; 0
+              Enabled: true
+              Head Diameter: 0.30000001192092896
+              Head Length: 0.20000000298023224
+              Length: 0.30000001192092896
+              Line Style: Lines
+              Line Width: 0.029999999329447746
+              Name: global_plan
+              Offset:
+                X: 0
+                Y: 0
+                Z: 0
+              Pose Color: 255; 85; 255
+              Pose Style: None
+              Queue Size: 10
+              Radius: 0.029999999329447746
+              Shaft Diameter: 0.10000000149011612
+              Shaft Length: 0.10000000149011612
+              Topic: /move_base/DWAPlannerROS/global_plan
+              Unreliable: false
+              Value: true
+          Enabled: true
           Name: DWA
         - Class: rviz/Group
           Displays:
@@ -692,7 +688,7 @@ Visualization Manager:
               Topic: /goal
               Unreliable: false
               Value: true
-          Enabled: true
+          Enabled: false
           Name: ARENA
       Enabled: true
       Name: planner
@@ -733,18 +729,18 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 47.334049224853516
+      Scale: 41.65396499633789
       Target Frame: <Fixed Frame>
       X: -1.7752348184585571
       Y: 3.3847336769104004
     Saved: ~
 Window Geometry:
   Displays:
-    collapsed: true
+    collapsed: false
   Height: 2752
-  Hide Left Dock: true
+  Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd000000040000000000000488000009b8fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b000fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000b0fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073000000006e000009b80000018200fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f000004bdfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000004bd0000013200fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000009b800000060fc0100000002fb0000000800540069006d00650100000000000009b8000006dc00fffffffb0000000800540069006d00650100000000000004500000000000000000000009b8000009b800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd000000040000000000000488000009b8fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b000fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000b0fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000006e000009b80000018200fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f000004bdfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000004bd0000013200fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000009b800000060fc0100000002fb0000000800540069006d00650100000000000009b8000006dc00fffffffb0000000800540069006d0065010000000000000450000000000000000000000524000009b800000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
