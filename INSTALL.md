@@ -46,7 +46,7 @@ sudo apt install -y  \
 	ros-noetic-tf-conversions \
 	ros-noetic-tf2-sensor-msgs 
 ```
-5) Clone arena-rosnav-3D repo
+5) Clone arena-rosnav-3D repo (should be cloning my repo which i forked)
 ```shell
 cd ~/w/catkin_ws/src && \
   git clone https://github.com/ignc-research/arena-rosnav-3D.git
