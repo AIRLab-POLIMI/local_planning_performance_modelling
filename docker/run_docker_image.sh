@@ -15,7 +15,7 @@ if [ $# -eq 2 ]
         --cpuset-cpus "$2" \
         -v ~/ds/performance_modelling/output:/home/"$USER_NAME"/ds/performance_modelling/output \
         -v ~/ds/performance_modelling/ros_logs:/home/"$USER_NAME"/.ros/log \
-        "$USER_NAME"/local_planning_performance_modelling_melodic:v2
+        "$USER_NAME"/local_planning_performance_modelling_noetic_full:v1
   else
     echo "usage: $0 container_id cpu_set"
 fi

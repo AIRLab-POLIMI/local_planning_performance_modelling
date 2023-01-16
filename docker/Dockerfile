@@ -1,4 +1,4 @@
-FROM ros:melodic
+FROM osrf/ros:noetic-desktop-full
 
 ARG user_uid
 ARG user_name
@@ -6,10 +6,11 @@ ARG user_gid
 ARG user_group
 
 
+RUN apt update
+
 # Install dependences
 RUN \
 apt install -y  \
-	bash-completion \
 	htop \
 	git-extras \
 	nano \
@@ -18,8 +19,6 @@ apt install -y  \
 	python3-pip \
 	python3-shapely \
 	python3-yaml \
-	python3-skimage \
-	python3-sklearn \
 	python-psutil \
 	python3-psutil \
 	ros-noetic-catkin \
@@ -41,6 +40,28 @@ apt install -y  \
 	ros-noetic-tf-conversions \
 	ros-noetic-tf2-sensor-msgs 
 
+# Install dependences (arena)
+RUN \
+apt install -y  \
+	libopencv-dev \
+	liblua5.2-dev \
+	screen \
+	python3-rosdep \
+	python3-rosinstall \
+	python3-rosinstall-generator \
+	build-essential \
+	python3-rospkg-modules \
+	ros-noetic-navigation \
+	ros-noetic-teb-local-planner \
+	ros-noetic-mpc-local-planner \
+	libarmadillo-dev \
+	ros-noetic-nlopt \
+	ros-noetic-turtlebot3-description \
+	ros-noetic-turtlebot3-navigation \
+	ros-noetic-lms1xx \
+	ros-noetic-velodyne-description \
+	python-is-python3
+
 
 # copy enrtypoint
 COPY ros_entrypoint.sh /ros_entrypoint.sh
@@ -61,9 +82,25 @@ RUN \
   cd ~/w/catkin_ws/src && \
   git clone --branch=master https://github.com/AIRLab-POLIMI/performance_modelling.git && \
   git clone --branch=noetic-devel-temp https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
-  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git 
+  git clone --branch=melodic-devel https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git
+  
+  
+#   && \
+#  git clone --branch=main https://github.com/AIRLab-POLIMI/arena-rosnav-3D.git
+  
 # gazebo_ros_pkgs needs to be cloned from the melodic-devel even if it is noetic
 # TODO set appropriate performance_modelling tag version
+
+RUN sudo apt install -y python3-catkin-tools
+
+#RUN sudo rm -rf /var/lib/apt/lists/*
+
+#RUN sudo apt update
+#RUN sudo apt install -y libeigen3-dev libpcl-dev ros-noetic-pcl-msgs ros-noetic-roscpp ros-noetic-sensor-msgs ros-noetic-std-msgs
+
+#RUN cd ~/w/catkin_ws/src && git clone --branch=melodic-devel https://github.com/ros-perception/perception_pcl.git
+
+#RUN sudo apt install -y ros-noetic-pcl-conversions
 
 # build workspace and install python user packages
 RUN \
@@ -72,12 +109,10 @@ RUN \
   catkin build -j 16
 
 RUN \
-  pip install pyquaternion && \
-  pip3 install pyquaternion && \
-  pip install networkx && \
-  pip3 install networkx && \
-  pip install scikit-image && \
-  pip3 install scikit-image
+  pip3 install pyquaternion networkx scikit-learn scikit-image pandas numpy scipy pillow
+
+# install python packages for arena
+#RUN pip3 install pyyaml catkin_pkg gym netifaces pathlib filelock pyqt5 mpi4py torch lxml scipy defusedxml numpy==1.19.2 pillow==8.3.2
 
 RUN \
   cd ~/w/catkin_ws/src/performance_modelling/ && \
@@ -87,7 +122,7 @@ RUN mkdir -p ~/.ros/log
 RUN mkdir -p ~/ds/performance_modelling
 RUN \
   cd ~/ds/performance_modelling && \
-  git clone --branch=devel-temp https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \
+  git clone --branch=local-planning-ROS1-new https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \
   ~/w/catkin_ws/src/performance_modelling/performance_modelling_py/environment/decompress_dataset_files.py
 
 # copy bashrc files
