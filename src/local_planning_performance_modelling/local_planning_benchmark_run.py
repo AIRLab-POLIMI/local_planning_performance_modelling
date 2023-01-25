@@ -298,17 +298,17 @@ class BenchmarkRun(object):
         # 1.2) select the goal node pseudo-randomly using the run number
         # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
         nil = copy.copy(list(voronoi_graph.nodes))  
-        print("Possible goals: ", nil)
+        #print("Possible goals: ", nil)
         random.Random(0).shuffle(nil)
         pseudo_random_voronoi_index_goal = nil[self.run_index % len(nil)]
-        print("goal index: ", pseudo_random_voronoi_index_goal)
+        #print("goal index: ", pseudo_random_voronoi_index_goal)
 
         # 1.3) convert Voronoi node to pose
         self.goal_pose = PoseStamped()
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-        print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y), "q: " + str(q))
+        #print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y), "q: " + str(q))
 
         # 1.4) save the xy coordinates corresponding to the goal node
         x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
@@ -316,7 +316,7 @@ class BenchmarkRun(object):
 
         # 1.5) find the connected component contaning goal node
         goal_connected_component = nx.node_connected_component(voronoi_graph, pseudo_random_voronoi_index_goal)
-        print("Goal connected component: ", goal_connected_component)
+        #print("Goal connected component: ", goal_connected_component)
     
 
         # 2) choose starting position for the robot between filtered voronoi nodes
@@ -325,8 +325,8 @@ class BenchmarkRun(object):
         pedestrian_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
         # max distance defines the maximum distance possible for the pedestrian w.r.t to the goal position
         pedestrian_max_distance = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['radius'] - pedestrian_circumscribing_radius
-        print("Ped max distance: ", pedestrian_max_distance)
-        print("Ped min distance: ", pedestrian_min_distance)
+        #print("Ped max distance: ", pedestrian_max_distance)
+        #print("Ped min distance: ", pedestrian_min_distance)
         maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
@@ -337,7 +337,6 @@ class BenchmarkRun(object):
         # consider only those nodes which are in the goal connected component, so that we can guarantee there is a shortest path between start and goal 
         filtered = filter(lambda l: l in goal_connected_component, index_list)
         index_filtered_list = list(filtered)
-        print(index_filtered_list)
         # if present, remove the goal node from this list so it is guaranteed that the condition goal = start is never encountered
         if (pseudo_random_voronoi_index_goal in index_filtered_list): 
             index_filtered_list.remove(pseudo_random_voronoi_index_goal)
@@ -348,10 +347,10 @@ class BenchmarkRun(object):
 
         robot_initial_pose_x = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
         robot_initial_pose_y = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
-        print("robot_initial_pose_x", robot_initial_pose_x)
-        print("robot_initial_pose_y", robot_initial_pose_y)
-        print("Pseudo start: ", pseudo_random_voronoi_index_start)
-        print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
+        # print("robot_initial_pose_x", robot_initial_pose_x)
+        # print("robot_initial_pose_y", robot_initial_pose_y)
+        # print("Pseudo start: ", pseudo_random_voronoi_index_start)
+        # print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
 
         # 3) generate pseudocasually the initial orientation theta of the robot
 
@@ -361,13 +360,13 @@ class BenchmarkRun(object):
         orientation_array_copy = copy.copy(orientation_array)  
         random.Random(0).shuffle(orientation_array_copy)
         pseudo_random_theta = orientation_array_copy[self.run_index % len(orientation_array_copy)]
-        print("Pseudo random theta: ", pseudo_random_theta)
+        #print("Pseudo random theta: ", pseudo_random_theta)
         robot_initial_pose_theta = float(pseudo_random_theta)
 
         # 4.1) given starting robot position and goal position, find the shortest path from goal to start robot pos
-        print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
+        #print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
-        print(shortest_path)
+        #print(shortest_path)
         # self.ground_truth_map.save_voronoi_plot("/home/emanuele/temp/voronoi.svg", graph=voronoi_graph, min_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius)
 
         # 4.2) prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
@@ -387,10 +386,10 @@ class BenchmarkRun(object):
         
         # compute distance between robot position and goal to check for overlapping between the 2 circumferences defined by pedestrian_min_distance and pedestrian_max_distance, each respectively centered in robot_initial_pose and goal_pose
         initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
-        print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
+        #print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
         # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal. 
         if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance + pedestrian_max_distance):   
-            print("No overlapping between robot initial pose and goal")
+            #print("No overlapping between robot initial pose and goal")
             x_agent, y_agent = x_goal, y_goal
             dx = dy = 0.1
             n = pedestrian_number
@@ -411,7 +410,7 @@ class BenchmarkRun(object):
         # Case 2: there is overlapping. It is necessary to choose a position for the pedestrian such that it is outside of the forbidden zone defined by the circumference centered in robot_initial_pose and ray equal to ped_min_distance. 
         # In order to choose a position, a sample approach is adopted.
         else: 
-            print("Overlapping between robot initial pose and goal")
+            #print("Overlapping between robot initial pose and goal")
             ped_index = 0   # index counting the number of pedestrians for which the sample has been chosen.
             count_index = 0 # index counting the number of cycles. It is used to guarantee that the seed is always different at each loop, hence having the same samples at each run which is useful for the replicability of the experiments.
                             # Also each pedestrian has nearly always a different sample. 
