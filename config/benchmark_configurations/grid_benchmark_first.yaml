@@ -1,0 +1,105 @@
+run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+run_replication_index: &id002 [0]
+environment_name: &id003 [7A-2, airlab, fr079, intel, mexico, office_b]
+odometry_error: &id004 [[0.01, 0.0, 0.01, 0.0]]
+amcl_alpha_factor: &id005 [1.0]
+localization_node: &id006 [amcl]
+global_planner_node: &id007 [global_planner]
+available_cpu_threads: &id008 [4] 
+
+combinatorial_parameters: [
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [dwa],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [0],
+    min_turning_radius: [0.0],
+  },
+
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [teb],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [0],
+    min_turning_radius: [0.0, 0.1],
+  },
+
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [arena],
+    global_planner_node: [global_planner],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [0],
+  },
+
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [dwa],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [5, 100], 
+    pedestrian_max_vel: [0.3, 0.6],
+    min_turning_radius: [0.0],
+  },
+
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    local_planner_node: [teb],
+    global_planner_node: [global_planner],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [5, 100],
+    pedestrian_max_vel: [0.3, 0.6], 
+    min_turning_radius: [0.0, 0.1],
+  },
+
+  {
+    robot_model: [turtlebot3_waffle_performance_modelling],
+    localization_node: [amcl],
+    local_planner_node: [arena],
+    global_planner_node: [global_planner],
+    run_index: *id001,
+    run_replication_index: *id002,
+    environment_name: *id003,
+    odometry_error: *id004,
+    amcl_alpha_factor: *id005,
+    localization_node: *id006,
+    global_planner_node: *id007,
+    available_cpu_threads: *id008,
+    pedestrian_number: [5, 100],
+    pedestrian_max_vel: [0.3, 0.6], 
+  }
+]
