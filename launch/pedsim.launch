@@ -16,22 +16,6 @@
     <arg name="update_rate" default="25.0"/> <!-- Hz -->
     <arg name="spawn_period" default="5.0"/>
 
-      <!-- Simulator  -->
-      <!-- <include file="$(find pedsim_simulator)/launch/simulator.launch">
-        <arg name="kbd_teleop" value="$(arg kbd_teleop)"/>
-        <arg name="rqt_teleop" value="$(arg rqt_teleop)"/>
-        <arg name="scene_file" value="$(arg scene_file)"/>
-        <arg name="with_robot" value="$(arg with_robot)"/>
-        <arg name="simulation_factor" value="$(arg simulation_factor)"/>
-        <arg name="update_rate" value="$(arg update_rate)"/>
-        <arg name="default_queue_size" value="10"/>
-        <arg name="max_robot_speed" value="1.5"/>
-        <arg name="robot_mode" value="1"/>
-        <arg name="enable_groups" value="true"/>
-        <arg name="pedestrian_number" value="$(arg pedestrian_number)"/>
-        <arg name="pedestrian_max_vel" value="$(arg pedestrian_max_vel)"/>
-      </include>   -->
-
       <node name="pedsim_simulator" pkg="pedsim_simulator" type="pedsim_simulator" output="screen">
         <param name="scene_file" value="$(arg scene_file)" type="string"/>
         <param name="pedestrian_number" value="$(arg pedestrian_number)" type="int"/>
@@ -48,9 +32,10 @@
          <!-- this node spawn pedsim actors to gazebo once, then the plugin updates their pose  -->
       <node pkg="pedsim_gazebo_plugin" type="spawn_pedsim_agents.py" name="spawn_pedsim_agents"  output="screen"> </node> 
   
-      <!-- Visualizer -->
+      <!-- removed visualizer for the moment as it may be a problem for the docker -->
+      <!-- Visualizer 
       <node name="pedsim_visualizer" type="pedsim_visualizer_node" pkg="pedsim_visualizer" output="screen">
         <param name="walls_marker_scale" type="double" value="0.05" />
-      </node> 
+      </node> --> 
 
 </launch>
