@@ -168,3 +168,6 @@ complete -F _complete_alias rcd
 
 alias ust='rosparam set use_sim_time true'
 
+# ROS1 execute benchmark ignore previous runs
+alias test_run='rosrun local_planning_performance_modelling execute_grid_benchmark.py --ignore-previous-runs'
+complete -F _complete_alias test_run
