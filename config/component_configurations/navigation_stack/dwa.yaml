@@ -28,8 +28,8 @@ DWAPlannerROS:
   sim_granularity: 0.025  #  The granularity with which to check for collisions along each trajectory in meters
   angular_sim_granularity: 0.1  #  The granularity with which to check for collisions for rotations in radians
 
-  path_distance_bias: 0.6  #  The weight for the path distance part of the cost function
-  goal_distance_bias: 0.8  #  The weight for the goal distance part of the cost function
+  path_distance_bias: 32.0  #  The weight for the path distance part of the cost function
+  goal_distance_bias: 24.0  #  The weight for the goal distance part of the cost function
   occdist_scale: 0.01  #  The weight for the obstacle distance part of the cost function
   twirling_scale: 0.0  #  The weight for penalizing any changes in robot heading
 

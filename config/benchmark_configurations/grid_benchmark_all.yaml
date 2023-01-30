@@ -1,28 +1,45 @@
-#run_index: &id001 [0, 1, 2]
-run_index: &id001 [4]
+run_index: &id001 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+#run_index: &id001 [7]
+run_replication_index: &id003 [0]
 
-environment_name: &id002 [airlab]
+environment_name: &id002 [intel]
 #environment_name: &id002 [7A-2, airlab, fr079, intel, mexico, office_b]
 
 combinatorial_parameters: [
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
-    odometry_error: [[0.0, 0.0, 0.0, 0.0]],
-    amcl_alpha_factor: [0],
+
+    odometry_error: [[0.01, 0.0, 0.01, 0.0]],
+    amcl_alpha_factor: [1.0],
     localization_node: [amcl],
     local_planner_node: [dwa],
     global_planner_node: [global_planner],
     run_index: *id001,
+    run_replication_index: *id003,
     environment_name: *id002,
+    pedestrian_number: [5],
+    pedestrian_max_vel: [0.3], 
+    min_turning_radius: [0.01],
+    #dynamic_constraints: [[], []], # [max_vel_x, max_vel_theta, max_accel_x, max_accel_theta] la prima lista i parametri di default (0.26, etc) la seconda con i parametri di default di teb
   },
-  #{
-   # robot_model: [turtlebot3_waffle_performance_modelling],
-   # odometry_error: [[0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
-   # amcl_alpha_factor: [1.0],
-   # localization_node: [amcl],
-   # local_planner_node: [dwa],
-   # global_planner_node: [global_planner],
-   # run_index: *id001,
-   # environment_name: *id002,
-  #},
+  # {
+  #   robot_model: [turtlebot3_waffle_performance_modelling],
+  #   # odometry_error: [[0.02, 0.0, 0.02, 0.0], [0.05, 0.0, 0.05, 0.0], [0.1, 0.0, 0.1, 0.0]],
+  #   odometry_error: [[0.01, 0.0, 0.01, 0.0]], # 0.1 = 10% di errore. [v, correlazione tra v e w = 0, w, correlazione tra w e v = 0] odom legge la velocità come v_eff + v, questo per rendere più realistica la simulazione ()
+  #   amcl_alpha_factor: [1.0],
+  #   localization_node: [amcl],
+  #   local_planner_node: [dwa],
+  #   global_planner_node: [global_planner],
+  #   run_index: *id001,
+  #   run_replication_index: *id003,
+  #   environment_name: *id002,
+  #   pedestrian_number: [5, 100], # 0-5-100   # i parametri in comune mettili fuori
+  #   pedestrian_max_vel: [0.3],
+  #   min_turning_radius: [0.0],
+  #   available_cpu_threads: [4]
+  # },
+
 ]
+
+
+# Quando l'odometry error è pari a 0 è necessario settare amcl_alpha_factor a 0 per dire di non usarlo. Negli altri casi di odometry error != 0, allora alpha factor = 1.0

@@ -144,3 +144,6 @@ sudo chown `id -u`:`id -g` ~/ds/performance_modelling/output
 sudo chown `id -u`:`id -g` ~/.ros/log/
 
 cd ~
+
+# setup the virtual screen
+Xvfb :1 -screen 0 1024x768x16 &> xvfb.log  &

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <arg name="local_planner_params_file"/>
+    <arg name="global_planner_params_file"/>
+    <arg name="nav_params_file"/>
+    <arg name="map"/>
+    <arg name="output" default="screen"/>
+
+    <node
+        name="move_base"
+        pkg="move_base"
+        type="move_base"
+        respawn="false"
+        required="true"
+        output="$(arg output)">
+        <rosparam file="$(arg local_planner_params_file)"/>  <!-- in this case gring.yaml is not empty, so this parameter shall not be commented -->
+        <rosparam file="$(arg global_planner_params_file)"/>
+        <rosparam file="$(arg nav_params_file)"/>
+    </node>
+
+    <node
+        name="map_server"
+        pkg="map_server"
+        type="map_server"
+        args="$(arg map)"
+        respawn="false"
+        required="true"
+        output="$(arg output)">
+    </node>
+
+
+    <!-- RL infrastructure -->
+        <node pkg="rl_agent" type="laser_scan_merger" name="laser_scan_merger" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+        
+        <node pkg="rl_local_planner" type="image_generator" name="image_generator" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+        <node pkg="rl_local_planner" type="wp_generator" name="wp_generator" output="screen">
+            <!-- <remap from="/tf" to="/$(arg ns)/tf"/>
+            <remap from="/clock" to="/$(arg ns)/clock"/> -->
+        </node>	
+
+    <!-- DRL node using PPO2 for simulation (no training) -->
+    <node pkg="rl_agent" type="run_ppo.py" name="run_ppo" output="screen" args="ppo2_1_img_disc_0 CnnPolicy 1 1 0 1 ped 1" />    
+
+</launch>
+

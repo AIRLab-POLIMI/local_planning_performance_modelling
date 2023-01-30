@@ -94,12 +94,14 @@ class LocalPlanningBenchmarkSupervisor:
         self.ps_pid_father = rospy.get_param('~pid_father')
         self.ps_processes = psutil.Process(self.ps_pid_father).children(recursive=True)  # list of processes children of the benchmark script, i.e., all ros nodes of the benchmark including this one
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.ground_truth_map_info_path)
-        self.initial_pose_covariance_matrix = np.zeros((6, 6), dtype=float)
-        self.initial_pose_covariance_matrix[0, 0] = rospy.get_param('~initial_pose_std_xy')**2
-        self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
-        self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
+        # self.initial_pose_covariance_matrix = np.zeros((6, 6), dtype=float)
+        # self.initial_pose_covariance_matrix[0, 0] = rospy.get_param('~initial_pose_std_xy')**2
+        # self.initial_pose_covariance_matrix[1, 1] = rospy.get_param('~initial_pose_std_xy')**2
+        # self.initial_pose_covariance_matrix[5, 5] = rospy.get_param('~initial_pose_std_theta')**2
         self.goal_tolerance = rospy.get_param('~goal_tolerance')
-        self.goal_obstacle_min_distance = rospy.get_param('~goal_obstacle_min_distance')
+        self.robot_circumscribing_radius = rospy.get_param('~robot_circumscribing_radius')
+        self.pedestrian_circumscribing_radius = rospy.get_param('~pedestrian_circumscribing_radius')
+
         self.goal_publication_type = rospy.get_param('~goal_publication_type')  
 
         # run variables
@@ -182,10 +184,10 @@ class LocalPlanningBenchmarkSupervisor:
         print_info("finished waiting to receive first sensor message from environment", logger=rospy.loginfo)
 
         # get deleaved reduced Voronoi graph from ground truth map
-        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.goal_obstacle_min_distance).copy()
-        print_fatal(voronoi_graph.nodes)
-        for i in voronoi_graph.nodes:
-            print_info(i, voronoi_graph.nodes[i]['vertex'])
+        voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=self.robot_circumscribing_radius + 2.0*self.pedestrian_circumscribing_radius).copy()
+        # print_fatal(voronoi_graph.nodes)
+        # for i in voronoi_graph.nodes:
+        #     print_info(i, voronoi_graph.nodes[i]['vertex'])
         
 
         # in case the graph has multiple unconnected components, remove the components with less than two nodes
@@ -277,7 +279,7 @@ class LocalPlanningBenchmarkSupervisor:
         if not self.prevent_shutdown:
             rospy.signal_shutdown('run completed')
 
-    def send_topic_goal(self):
+    def send_topic_goal(self):    
         goal_msg = PoseStamped()
         goal_msg.header.stamp = rospy.Time.now()
         goal_msg.header.frame_id = self.fixed_frame
@@ -292,11 +294,16 @@ class LocalPlanningBenchmarkSupervisor:
             
         goal_position = self.goal_pose.pose.position
         start_time = rospy.Time.now()
+        current_position = None
+        last_time_robot_movement = None
+        last_time_robot_stuck = None
+        start = start_time
 
         while not rospy.is_shutdown():
-            curren_time = rospy.Time.now()
+            current_time = rospy.Time.now()
             rospy.sleep(0.1)
-            total_waiting_time = curren_time - start_time
+            total_waiting_time = current_time - start_time
+            latest_position = current_position      # la prima volta è uguale a None
             if total_waiting_time.to_sec() > self.run_timeout:
                 self.write_event('waypoint_timeout')
                 self.write_event('supervisor_finished')
@@ -310,7 +317,40 @@ class LocalPlanningBenchmarkSupervisor:
                     self.write_event('navigation_goal_reached')
                     break
                 else: 
-                    rospy.loginfo("still trying to get to goal position")
+                    rospy.loginfo("attempting to reach goal position")
+
+                if latest_position is not None:
+                    # distance between current position and latest saved position of the robot
+                    latest_distance = np.sqrt((latest_position.x - current_position.x) ** 2 + (latest_position.y - current_position.y) ** 2)
+                    #print_error("Latest distance:")
+                    #print_error(latest_distance)
+                    if latest_distance > 0.009: # il robot si sta muovendo
+                        time_stuck = 0
+                        start = current_time
+                        #print_error("robot is moving")
+                        last_time_robot_movement = rospy.Time.now() # ultimo istante in cui il robot si è mosso
+                    else:    # il robot non si sta muovendo
+                        #print_error("robot is NOT moving")
+                        last_time_robot_stuck = rospy.Time.now() # ultimo istante in cui il robot è stato rilevato essere fermo
+                    
+                    # if last_time_robot_stuck is not None:
+                    #     time_stuck = last_time_robot_stuck - start
+                    #     print_error("Time Stuck:")
+                    #     print_error(time_stuck.to_sec()) 
+
+
+                    if last_time_robot_movement is not None and last_time_robot_stuck is not None:    # questo funziona se il robot si è mosso all'inizio e poi si blocca
+                        total_elapsed_time = current_time - last_time_robot_movement
+                        #print_error("Time 2:")
+                        #print_error(total_elapsed_time.to_sec()) 
+                        if total_elapsed_time.to_sec() > 10:    # vel_max = 23 cm/s           50 cm / 23 cm /s = 2 s, per ora settato a 10s, per le run si può mettere a 60s
+                            self.write_event('robot_stuck')
+                            raise RunFailException('robot_stuck')
+                            break
+                       
+                    #TODO mettere le threshold 0.1 e 20 come parametri 
+                 
+
         self.write_event('run_completed')
         if not self.prevent_shutdown:
             rospy.signal_shutdown('run completed')

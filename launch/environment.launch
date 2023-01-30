@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
 
-    <arg name="launch_gzclient"/>
-    <arg name="world"/>
     <arg name="urdf"/>
+    <arg name="world"/>
     <arg name="launch_rviz"/>
+    <arg name="launch_gzclient"/>
     <arg name="rviz_config_file"/>
     <arg name="output" default="screen"/>
 

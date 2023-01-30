@@ -24,8 +24,8 @@ components_configuration:
   rpp: navigation_stack/rpp.yaml
   teb: navigation_stack/teb.yaml
   dwa: navigation_stack/dwa.yaml
-  dwa_arena: navigation_stack/arena.yaml
   arena: navigation_stack/arena.yaml
+  gring: navigation_stack/gring.yaml
   global_planner: navigation_stack/global_planner.yaml
   smac: navigation_stack/smac.yaml
   rviz: rviz/default_view.rviz

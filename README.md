@@ -13,7 +13,10 @@ In the container, use the following command to automatically run the experiments
 ```shell
 rosrun local_planning_performance_modelling execute_grid_benchmark.py
 ```
-
+To use arena-planner, run the following command:
+```shell
+rosrun local_planning_performance_modelling execute_grid_benchmark.py --rviz --ignore-previous-runs -d grid_benchmark_all_arena.yaml
+```
 To see additional options, run the following command in the container:
 ```shell
 rosrun local_planning_performance_modelling execute_grid_benchmark.py -h
