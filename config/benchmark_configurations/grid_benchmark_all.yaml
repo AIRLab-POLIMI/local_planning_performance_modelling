@@ -8,6 +8,7 @@ environment_name: &id002 [intel]
 combinatorial_parameters: [
   {
     robot_model: [turtlebot3_waffle_performance_modelling],
+
     odometry_error: [[0.01, 0.0, 0.01, 0.0]],
     amcl_alpha_factor: [1.0],
     localization_node: [amcl],
