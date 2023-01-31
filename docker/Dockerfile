@@ -6,10 +6,8 @@ ARG user_gid
 ARG user_group
 
 
-RUN apt update
-
 # Install dependences
-RUN \
+RUN apt update && \
 apt install -y  \
 	htop \
 	git-extras \
@@ -42,7 +40,7 @@ apt install -y  \
 	ros-noetic-tf2-sensor-msgs 
 
 # Install dependences (arena)
-RUN \
+RUN apt update && \
 apt install -y  \
 	libopencv-dev \
 	liblua5.2-dev \
@@ -101,8 +99,7 @@ RUN \
 RUN pip3 install pyyaml catkin_pkg gym netifaces pathlib filelock pyqt5 mpi4py torch lxml defusedxml 
 
 # install virtual screen to support pedsim which uses qt
-RUN sudo apt update
-RUN sudo apt install -y xvfb 
+RUN sudo apt update && sudo apt install -y xvfb
 
 RUN \
   cd ~/w/catkin_ws/src/performance_modelling/ && \
