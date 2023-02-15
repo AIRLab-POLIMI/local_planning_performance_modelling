@@ -2,7 +2,7 @@ recovery_behaviors: [{name: conservative_reset, type: clear_costmap_recovery/Cle
 clearing_rotation_allowed: false  # default: true # Determines whether the robot will attempt an in-place rotation when attempting to clear out space. Note: This parameter is only used when the default recovery behaviors are in use, meaning the user has not set the recovery_behaviors parameter to anything custom
 conservative_reset_dist: 3.0  # The distance away from the robot in meters beyond which obstacles will be cleared from the costmap when attempting to clear space in the map. Note, this parameter is only used when the default recovery behaviors are used for move_base.
 recovery_behavior_enabled: true  # Whether to enable the move_base recovery behaviors to attempt to clear out space.
-controller_patience: 15.0  # How long the controller will wait in seconds without receiving a valid control before space-clearing operations are performed.
+controller_patience: 30.0  # How long the controller will wait in seconds without receiving a valid control before space-clearing operations are performed.
 planner_patience: 5.0  # How long the planner will wait in seconds in an attempt to find a valid plan before space-clearing operations are performed.
 max_planning_retries: -1  # How many times to allow for planning retries before executing recovery behaviors. A value of -1.0 corresponds to an infinite retries.
 
@@ -48,6 +48,7 @@ local_costmap:  # http://wiki.ros.org/costmap_2d
       clearing: True
       marking: True
       data_type: "LaserScan"
+      inf_is_valid: True
 
   inflation_layer:  # http://wiki.ros.org/costmap_2d/hydro/inflation#Parameters
     enabled: true

@@ -20,8 +20,8 @@ TebLocalPlannerROS:
  # Robot
          
  max_vel_x: 0.26
- max_vel_x_backwards: 0.0 # avoid teb to run backwards
-# max_vel_x_backwards: 0.2
+ #max_vel_x_backwards: 0.0 # avoid teb to run backwards !WARNING! 
+ max_vel_x_backwards: 0.2  
  max_vel_theta: 1.0
  acc_lim_x: 2.5
  acc_lim_theta: 3.2
@@ -48,7 +48,7 @@ TebLocalPlannerROS:
     
  min_obstacle_dist: 0.1
  inflation_dist: 0.1
- include_costmap_obstacles: True
+ include_costmap_obstacles: False
  include_dynamic_obstacles: True
  costmap_obstacles_behind_robot_dist: 1.0
  obstacle_poses_affected: 30
@@ -68,12 +68,12 @@ TebLocalPlannerROS:
  weight_acc_lim_x: 1
  weight_acc_lim_theta: 1
  weight_kinematics_nh: 1000
- weight_kinematics_forward_drive: 1
+ weight_kinematics_forward_drive: 1000  # weight to force the robot to run forward most of the times (instead of backwards)
  weight_kinematics_turning_radius: 1
  weight_optimaltime: 1
  weight_obstacle: 50
  weight_dynamic_obstacle: 10 # not in use yet
- alternative_time_cost: False # not in use yet
+ 
 
  # Homotopy Class Planner
 
