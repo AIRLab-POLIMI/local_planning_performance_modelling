@@ -50,5 +50,5 @@
         args="-d $(arg rviz_config_file)"
         if="$(arg launch_rviz)"
         output="log"/>
-
+        
 </launch>
