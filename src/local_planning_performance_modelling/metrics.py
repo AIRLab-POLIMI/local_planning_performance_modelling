@@ -9,6 +9,8 @@ from collections import defaultdict
 from os import path
 import numpy as np
 import pandas as pd
+import math
+import warnings
 import yaml
 from sensor_msgs.msg import LaserScan, PointCloud2
 import sensor_msgs.point_cloud2 as pc2
@@ -164,7 +166,7 @@ class TrajectoryLength:
 
         ground_truth_poses_df_clipped = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
         ground_truth_positions = ground_truth_poses_df_clipped[['x', 'y']].values
-
+        # fai una prova con 4 coordinate per vedere se usare atan o atan2 (mi aspetto 0)
         squared_deltas = (ground_truth_positions[1:-1] - ground_truth_positions[0:-2]) ** 2  # equivalent to (x_2-x_1)**2, (y_2-y_1)**2, for each row
         sum_of_squared_deltas = np.sum(squared_deltas, axis=1)  # equivalent to (x_2-x_1)**2 + (y_2-y_1)**2, for each row
         euclidean_distance_of_deltas = np.sqrt(sum_of_squared_deltas)  # equivalent to sqrt( (x_2-x_1)**2 + (y_2-y_1)**2 ), for each row
@@ -327,7 +329,9 @@ class CollisionRate:
             laser_scan_msg.range_min = float(scan_row[4])
             laser_scan_msg.range_max = float(scan_row[5])
             laser_scan_msg.ranges = list(map(float, scan_row[6:]))
-            pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
             point_generator = pc2.read_points(pointcloud_msg)
             for point_pc2 in point_generator:
                 if not np.isnan(point_pc2[0]):
@@ -356,7 +360,7 @@ class Clearance:
         self.verbose = verbose
         self.metric_name = "clearance"
         self.version = 2
-
+    
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
         if not self.recompute_anyway and \
@@ -414,9 +418,10 @@ class Clearance:
             laser_scan_msg.range_min = float(scan_row[4])
             laser_scan_msg.range_max = float(scan_row[5])
             laser_scan_msg.ranges = list(map(float, scan_row[6:]))
-            pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
             point_generator = pc2.read_points(pointcloud_msg)
-
             points_clearance_list = list()
             for point_pc2 in point_generator:
                 if not np.isnan(point_pc2[0]):
@@ -482,7 +487,7 @@ class CpuTimeAndMaxMemoryUsage:
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
-                # print(process_name)
+                #print(process_name)
                 if process_name not in ['gzserver', 'gzclient', 'rviz2', 'local_planning_']:  # ignore simulator and rviz to count the robot system memory
                     cpu_time_dict[process_name] = max(
                         cpu_time_dict[process_name],
@@ -1352,83 +1357,4 @@ class CmdVel:
             self.results_df["mean_cmd_vel_translation"] = [float(np.mean(translation_cmds))]
             self.results_df["mean_cmd_vel_rotation"] = [float(np.mean(rotation_cmds))]
             self.results_df[f"{self.metric_name}_version"] = [self.version]
-        return True
-    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
-        self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
-        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
-        self.verbose = verbose
-        self.metric_name = "motion_characteristics"
-        self.version = 4
-
-    def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
-
-        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
-        self.results_df["average_translation_velocity"] = [np.nan]
-        self.results_df["average_rotation_velocity"] = [np.nan]
-        self.results_df["translation_rotation_product"] = [np.nan]
-        self.results_df["average_translation_acceleration"] = [np.nan]
-        self.results_df["average_rotation_acceleration"] = [np.nan]
-        self.results_df["translation_rotation_acceleration_product"] = [np.nan]
-
-        # check required files exist
-        if not path.isfile(self.ground_truth_poses_file_path):
-            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
-            return False
-
-        if not path.isfile(self.run_events_file_path):
-            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
-            return False
-
-        # get timestamps info from run events
-        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
-        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
-        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
-        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
-
-        if len(navigation_start_events) != 1:
-            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
-            self.results_df[f"{self.metric_name}_version"] = [self.version]
-            return True
-
-        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
-            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
-            self.results_df[f"{self.metric_name}_version"] = [self.version]
-            return True
-
-        navigation_start_time = navigation_start_events.iloc[0].t
-        navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
-
-        # get the dataframes for ground truth poses
-        ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
-        ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
-
-        # compute derivative of velocity
-        ground_truth_poses_df = ground_truth_poses_df.rolling(11, center=True).mean()
-        ground_truth_poses_df['v_tran'] = np.sqrt(ground_truth_poses_df.v_x**2 + ground_truth_poses_df.v_y**2)
-        ground_truth_poses_df['v_rot'] = ground_truth_poses_df.v_theta
-        diff_df = ground_truth_poses_df.diff()
-        diff_df['a_tran'] = np.sqrt((diff_df.v_x/diff_df.t)**2 + (diff_df.v_y/diff_df.t)**2)
-        diff_df['a_rot'] = diff_df.v_theta/diff_df.t
-        diff_df = diff_df.rolling(11, center=True).mean()
-
-        vt = np.abs(ground_truth_poses_df.v_tran)
-        vr = np.abs(ground_truth_poses_df.v_rot)
-        at = np.abs(diff_df.a_tran)
-        ar = np.abs(diff_df.a_rot)
-
-        self.results_df["average_velocity_atan"] = [float(np.mean(np.arctan2(vr, vt)))]
-        self.results_df["average_translation_velocity"] = [float(np.mean(vt))]
-        self.results_df["average_rotation_velocity"] = [float(np.mean(vr))]
-        self.results_df["translation_rotation_product"] = [float(np.mean(vt * vr))]
-        self.results_df["average_translation_acceleration"] = [float(np.mean(at))]
-        self.results_df["average_rotation_acceleration"] = [float(np.mean(ar))]
-        self.results_df["translation_rotation_acceleration_product"] = [float(np.mean(at * ar))]
-        self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
