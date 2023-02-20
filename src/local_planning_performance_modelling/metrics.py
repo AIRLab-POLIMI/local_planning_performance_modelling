@@ -1358,3 +1358,80 @@ class CmdVel:
             self.results_df["mean_cmd_vel_rotation"] = [float(np.mean(rotation_cmds))]
             self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
+
+class NormalizedCurvature:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "normalized_curvature"
+        self.version = 1
+
+
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # check required files exist
+        if not path.isfile(self.ground_truth_poses_file_path):
+            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
+            return False
+
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df[self.metric_name] = [np.nan]
+
+        # get timestamps info from run events
+        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
+        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
+        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
+        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
+
+        if len(navigation_start_events) != 1:
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        navigation_start_time = navigation_start_events.iloc[0].t
+        navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
+
+        # get the dataframes for ground truth poses
+        ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
+
+        ground_truth_poses_df_clipped = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
+        ground_truth_positions = ground_truth_poses_df_clipped[['x', 'y']].values
+
+        normalized_curvature = 0
+        sample_size = len(ground_truth_positions)
+
+        if(sample_size > 2):
+            # if path has more than 2 samples then consider a triplet of contiguous points (p1,p2,p3) and compute the internal angle adjacent to p2 
+            for i in range(sample_size-2):
+                p1 = ground_truth_positions[i]
+                p2 = ground_truth_positions[i+1]
+                p3 = ground_truth_positions[i+2]
+                
+                angle = math.atan2(p3[1]-p2[1], p3[0]-p2[0]) - math.atan2(p1[1]-p2[1], p1[0]-p2[0])
+                if (abs(angle) > math.pi):
+                    angle = 2 * math.pi + angle if angle < 0 else -2 * math.pi + angle
+                # if the angle is exactly 180° then the path was straight so it makes no sense to compute the curvature
+                elif (abs(angle) == math.pi):
+                    continue
+                normalized_curvature += angle
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df[self.metric_name] = [float(normalized_curvature)]
+        return True
