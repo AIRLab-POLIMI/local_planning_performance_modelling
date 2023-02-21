@@ -67,7 +67,7 @@ class BenchmarkRun(object):
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
         min_turning_radius = self.run_parameters['min_turning_radius'] if 'min_turning_radius' in self.run_parameters else None
-        
+        #max_samples = self.run_parameters['max_samples'] if 'min_turning_radius' in self.run_parameters else None   # used only for teb
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
         pedestrian_number = self.run_parameters['pedestrian_number']
 
@@ -240,6 +240,7 @@ class BenchmarkRun(object):
                 local_planner_configuration['TebLocalPlannerROS']['footprint_model'] = {'type': "polygon", 'vertices': turtlebot_footprint}  # TEB does not accept the footprint in the form of a string 
                 local_planner_configuration['TebLocalPlannerROS']['wheelbase'] = turtlebot_wheelbase
                 local_planner_configuration['TebLocalPlannerROS']['min_turning_radius'] = min_turning_radius
+        #        local_planner_configuration['TebLocalPlannerROS']['max_samples'] = max_samples
         #     elif robot_model == 'hunter2':
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['footprint_model.type'] = "polygon"
@@ -273,11 +274,6 @@ class BenchmarkRun(object):
         # compute voronoi_graph in order to generate waypoints
         self.ground_truth_map = ground_truth_map.GroundTruthMap(self.map_info_file_path)
         voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius).copy()
-        
-        # Requirement 1: il pedone deve essere ad una distanza >= initial_node_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
-        # The above requirement guarantees that the pedestrians will not spawn too close to the robot, 
-        # hence causing an initial collision (this could happen if the initial node and goal node are the same or if they are nearby nodes)
-        # Requirement 2: peds 
 
         # from voronoi graph add waypoints into scene.xml 
         waypoint_radius = 0.5
@@ -298,17 +294,15 @@ class BenchmarkRun(object):
         # 1.2) select the goal node pseudo-randomly using the run number
         # the list of indices is always shuffled the same way (seed = 0), so each run number will always correspond to the same Voronoi node
         nil = copy.copy(list(voronoi_graph.nodes))  
-        #print("Possible goals: ", nil)
         random.Random(0).shuffle(nil)
         pseudo_random_voronoi_index_goal = nil[self.run_index % len(nil)]
-        #print("goal index: ", pseudo_random_voronoi_index_goal)
+
 
         # 1.3) convert Voronoi node to pose
         self.goal_pose = PoseStamped()
         self.goal_pose.pose = Pose()
         self.goal_pose.pose.position.x, self.goal_pose.pose.position.y = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex']
         q = pyquaternion.Quaternion(axis=[0, 0, 1], radians=np.random.uniform(-np.pi, np.pi))
-        #print("Goal x: " + str(self.goal_pose.pose.position.x), "y: " + str(self.goal_pose.pose.position.y), "q: " + str(q))
 
         # 1.4) save the xy coordinates corresponding to the goal node
         x_goal = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['vertex'][0]
@@ -316,23 +310,20 @@ class BenchmarkRun(object):
 
         # 1.5) find the connected component contaning goal node
         goal_connected_component = nx.node_connected_component(voronoi_graph, pseudo_random_voronoi_index_goal)
-        #print("Goal connected component: ", goal_connected_component)
     
-
         # 2) choose starting position for the robot between filtered voronoi nodes
 
         # min distance defines the minimum distance possible for the pedestrian w.r.t to the robot position
         pedestrian_min_distance = robot_circumscribing_radius + pedestrian_circumscribing_radius
         # max distance defines the maximum distance possible for the pedestrian w.r.t to the goal position
         pedestrian_max_distance = voronoi_graph.nodes[pseudo_random_voronoi_index_goal]['radius'] - pedestrian_circumscribing_radius
-        #print("Ped max distance: ", pedestrian_max_distance)
-        #print("Ped min distance: ", pedestrian_min_distance)
-        maximum_initial_node_radius = 3.0       # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
+        # radius which guarantees that the initial position of the robot provides visibility with a laser sensor of 3.5m (which is the smallest max range we use)
+        maximum_initial_node_radius = 3.0      
+        
         # compute another voronoi graph with a different min radius so that we can guarantee that we have initial nodes in which there is enough space to spawn the pedestrians too.
         initial_node_voronoi_graph = self.ground_truth_map.deleaved_reduced_voronoi_graph(minimum_radius=pedestrian_min_distance).copy()
         # consider only those nodes whose radius is less or equal than 3 meters
         iterator = filter(lambda n: initial_node_voronoi_graph.nodes[n]['radius'] <= maximum_initial_node_radius, initial_node_voronoi_graph.nodes)
-        # TODO controlla cosa succede in intel
         index_list = list(iterator)
         # consider only those nodes which are in the goal connected component, so that we can guarantee there is a shortest path between start and goal 
         filtered = filter(lambda l: l in goal_connected_component, index_list)
@@ -347,11 +338,7 @@ class BenchmarkRun(object):
 
         robot_initial_pose_x = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][0])
         robot_initial_pose_y = float(initial_node_voronoi_graph.nodes[pseudo_random_voronoi_index_start]['vertex'][1])
-        # print("robot_initial_pose_x", robot_initial_pose_x)
-        # print("robot_initial_pose_y", robot_initial_pose_y)
-        # print("Pseudo start: ", pseudo_random_voronoi_index_start)
-        # print("Pseudo goal: ", pseudo_random_voronoi_index_goal)
-
+        
         # 3) generate pseudocasually the initial orientation theta of the robot
 
         # 3.1) create an array of size = num_angles_buckets, whose elements are set incrementally
@@ -360,17 +347,13 @@ class BenchmarkRun(object):
         orientation_array_copy = copy.copy(orientation_array)  
         random.Random(0).shuffle(orientation_array_copy)
         pseudo_random_theta = orientation_array_copy[self.run_index % len(orientation_array_copy)]
-        #print("Pseudo random theta: ", pseudo_random_theta)
         robot_initial_pose_theta = float(pseudo_random_theta)
 
         # 4.1) given starting robot position and goal position, find the shortest path from goal to start robot pos
-        #print("Compute shortest path from", pseudo_random_voronoi_index_goal, "to", pseudo_random_voronoi_index_start)
         shortest_path = nx.dijkstra_path(voronoi_graph, pseudo_random_voronoi_index_goal, pseudo_random_voronoi_index_start)
-        #print(shortest_path)
         # self.ground_truth_map.save_voronoi_plot("/home/emanuele/temp/voronoi.svg", graph=voronoi_graph, min_radius=robot_circumscribing_radius + 2.0*pedestrian_circumscribing_radius)
 
         # 4.2) prepare data for the robot agent to add in the xml (necessary so that pedestrians avoid it) 
-        
         x_agent, y_agent = robot_initial_pose_x, robot_initial_pose_y   
         dx = dy = 0.0
         n = 1
@@ -386,10 +369,9 @@ class BenchmarkRun(object):
         
         # compute distance between robot position and goal to check for overlapping between the 2 circumferences defined by pedestrian_min_distance and pedestrian_max_distance, each respectively centered in robot_initial_pose and goal_pose
         initial_pose_to_goal_euclidean_dist = sqrt((self.goal_pose.pose.position.x - robot_initial_pose_x)**2 + (self.goal_pose.pose.position.y - robot_initial_pose_y)**2)
-        #print("Euclidean distance between starting robot position and goal: ", initial_pose_to_goal_euclidean_dist)
+       
         # Case 1: there is no overlapping between initial and goal positions, spawn agents in goal. 
         if (initial_pose_to_goal_euclidean_dist >= pedestrian_min_distance + pedestrian_max_distance):   
-            #print("No overlapping between robot initial pose and goal")
             x_agent, y_agent = x_goal, y_goal
             dx = dy = 0.1
             n = pedestrian_number
@@ -410,7 +392,6 @@ class BenchmarkRun(object):
         # Case 2: there is overlapping. It is necessary to choose a position for the pedestrian such that it is outside of the forbidden zone defined by the circumference centered in robot_initial_pose and ray equal to ped_min_distance. 
         # In order to choose a position, a sample approach is adopted.
         else: 
-            #print("Overlapping between robot initial pose and goal")
             ped_index = 0   # index counting the number of pedestrians for which the sample has been chosen.
             count_index = 0 # index counting the number of cycles. It is used to guarantee that the seed is always different at each loop, hence having the same samples at each run which is useful for the replicability of the experiments.
                             # Also each pedestrian has nearly always a different sample. 
@@ -609,7 +590,7 @@ class BenchmarkRun(object):
                         'map': self.map_info_file_path,
                         'log_path': self.ros_log_directory,
             })
-        elif local_planner_node == 'gring':
+        elif local_planner_node == 'gring': # not implemented
             navigation_gring = Component('navigation_gring', 'local_planning_performance_modelling', 'navigation_gring.launch', {
                         'local_planner_params_file': self.local_planner_configuration_path,
                         'global_planner_params_file': self.global_planner_configuration_path,

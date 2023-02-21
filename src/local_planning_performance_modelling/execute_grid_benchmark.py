@@ -57,6 +57,12 @@ def main():
                         type=str,
                         default=default_base_run_folder,
                         required=False)
+    
+    parser.add_argument('-a', dest='alternative_base_run_folder',
+                        help='Alternative folder in which the result of each run will be placed. Additionally to the base_run_folder.',
+                        type=str,
+                        default=None,
+                        required=False)
 
     default_num_runs = 1
     parser.add_argument('-n', '--num-runs', dest='num_runs',
