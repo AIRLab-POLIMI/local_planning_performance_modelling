@@ -445,7 +445,7 @@ class CpuTimeAndMaxMemoryUsage:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
-        self.version = 1
+        self.version = np.nan
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -455,11 +455,11 @@ class CpuTimeAndMaxMemoryUsage:
             return True
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
-        self.results_df["controller_cpu_time"] = [np.nan]
-        self.results_df["planner_cpu_time"] = [np.nan]
+        self.results_df["move_base_cpu_time"] = [np.nan]
+        self.results_df["simulation_cpu_time"] = [np.nan]
         self.results_df["system_cpu_time"] = [np.nan]
-        self.results_df["controller_max_memory"] = [np.nan]
-        self.results_df["planner_max_memory"] = [np.nan]
+        self.results_df["move_base_max_memory"] = [np.nan]
+        self.results_df["simulation_max_memory"] = [np.nan]
         self.results_df["system_max_memory"] = [np.nan]
 
         # check required files exist
@@ -475,8 +475,11 @@ class CpuTimeAndMaxMemoryUsage:
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
 
-        cpu_time_dict = defaultdict(int)
-        max_memory_dict = defaultdict(int)
+        system_cpu_time_dict = defaultdict(int)
+        system_max_memory_dict = defaultdict(int)
+
+        simulation_cpu_time_dict = defaultdict(int)
+        simulation_max_memory_dict = defaultdict(int)
 
         for ps_snapshot_path in ps_snapshot_paths_list:
             try:
@@ -487,29 +490,38 @@ class CpuTimeAndMaxMemoryUsage:
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
-                #print(process_name)
-                if process_name not in ['gzserver', 'gzclient', 'rviz2', 'local_planning_']:  # ignore simulator and rviz to count the robot system memory
-                    cpu_time_dict[process_name] = max(
-                        cpu_time_dict[process_name],
+                if process_name not in ['gzserver', 'gzclient', 'rviz2', 'rviz', 'local_planning_', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # ignore simulator and rviz to count the robot system memory
+                    system_cpu_time_dict[process_name] = max(
+                        system_cpu_time_dict[process_name],
                         process_info['cpu_times'].user + process_info['cpu_times'].system
                     )
-                    max_memory_dict[process_name] = max(
-                        max_memory_dict[process_name],
+                    system_max_memory_dict[process_name] = max(
+                        system_max_memory_dict[process_name],
+                        process_info['memory_full_info'].pss
+                    )
+                else:
+                    simulation_cpu_time_dict[process_name] = max(
+                        simulation_cpu_time_dict[process_name],
+                        process_info['cpu_times'].user + process_info['cpu_times'].system
+                    )
+                    simulation_max_memory_dict[process_name] = max(
+                        simulation_max_memory_dict[process_name],
                         process_info['memory_full_info'].pss
                     )
 
-        if len(cpu_time_dict) == 0 or len(max_memory_dict) == 0:
+        if len(system_cpu_time_dict) == 0 or len(system_max_memory_dict) == 0:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
             return False
 
-        #print(cpu_time_dict)
-        self.results_df["controller_cpu_time"] = [cpu_time_dict["controller_server"]]
-        self.results_df["planner_cpu_time"] = [cpu_time_dict["planner_server"]]
-        self.results_df["system_cpu_time"] = [sum(cpu_time_dict.values())]
+        print("System cpu dictionary: ", system_cpu_time_dict)
+        print("Simulation cpu dictionary: ", simulation_cpu_time_dict)
+        self.results_df["move_base_cpu_time"] = [system_cpu_time_dict["move_base"]]
+        self.results_df["simulation_cpu_time"] = [sum(simulation_cpu_time_dict.values())]
+        self.results_df["system_cpu_time"] = [sum(system_cpu_time_dict.values())]
 
-        self.results_df["controller_max_memory"] = [max_memory_dict["controller_server"]]
-        self.results_df["planner_max_memory"] = [max_memory_dict["planner_server"]]
-        self.results_df["system_max_memory"] = [sum(max_memory_dict.values())]
+        self.results_df["move_base_max_memory"] = [system_max_memory_dict["movebase"]]
+        self.results_df["simulation_max_memory"] = [sum(simulation_max_memory_dict.values())]
+        self.results_df["system_max_memory"] = [sum(system_max_memory_dict.values())]
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
@@ -1414,23 +1426,28 @@ class NormalizedCurvature:
         ground_truth_poses_df_clipped = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
         ground_truth_positions = ground_truth_poses_df_clipped[['x', 'y']].values
 
-        normalized_curvature = 0
-        sample_size = len(ground_truth_positions)
+        curvature = 0
+        # number of (x,y) points in the table
+        point_size = len(ground_truth_positions)
 
-        if(sample_size > 2):
-            # if path has more than 2 samples then consider a triplet of contiguous points (p1,p2,p3) and compute the internal angle adjacent to p2 
-            for i in range(sample_size-2):
+        if(point_size > 2):
+            # if path has more than 2 points then consider a triplet of contiguous points (p1,p2,p3) and compute the internal angle adjacent to p2 
+            for i in range(point_size-2):
                 p1 = ground_truth_positions[i]
                 p2 = ground_truth_positions[i+1]
                 p3 = ground_truth_positions[i+2]
                 
-                angle = math.atan2(p3[1]-p2[1], p3[0]-p2[0]) - math.atan2(p1[1]-p2[1], p1[0]-p2[0])
-                if (abs(angle) > math.pi):
-                    angle = 2 * math.pi + angle if angle < 0 else -2 * math.pi + angle
-                # if the angle is exactly 180° then the path was straight so it makes no sense to compute the curvature
-                elif (abs(angle) == math.pi):
+                delta_x = (p2[0] - p1[0]) * (p3[0] - p2[0])
+                delta_y = (p2[1] - p1[1]) * (p3[1] - p2[1])
+                dist_p1_p2 = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+                dist_p2_p3 = math.sqrt((p2[0] - p3[0])**2 + (p2[1] - p3[1])**2)
+                angle = np.arccos((delta_x + delta_y) / (dist_p1_p2 * dist_p2_p3))
+                # if angle is equal to pi then the path is straight, so it makes no sense to compute the curvature
+                if (angle == math.pi):
                     continue
-                normalized_curvature += angle
+                curvature += angle
+        
+        normalized_curvature = curvature / point_size
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [float(normalized_curvature)]
