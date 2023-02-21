@@ -359,7 +359,7 @@ class Clearance:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "clearance"
-        self.version = 2
+        self.version = 3
     
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -410,6 +410,7 @@ class Clearance:
         scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
 
         clearance_list = list()
+        points_clearance_list = list()
         for i, scan_row in scans_df.iterrows():
             laser_scan_msg = LaserScan()
             laser_scan_msg.angle_min = float(scan_row[1])
@@ -422,7 +423,6 @@ class Clearance:
                 warnings.simplefilter("ignore")
                 pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
             point_generator = pc2.read_points(pointcloud_msg)
-            points_clearance_list = list()
             for point_pc2 in point_generator:
                 if not np.isnan(point_pc2[0]):
                     point = shp.Point(point_pc2[0] + base_scan_x_offset, point_pc2[1] + base_scan_y_offset)
@@ -445,7 +445,7 @@ class CpuTimeAndMaxMemoryUsage:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
-        self.version = np.nan
+        self.version = 3
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -513,8 +513,6 @@ class CpuTimeAndMaxMemoryUsage:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
             return False
 
-        print("System cpu dictionary: ", system_cpu_time_dict)
-        print("Simulation cpu dictionary: ", simulation_cpu_time_dict)
         self.results_df["move_base_cpu_time"] = [system_cpu_time_dict["move_base"]]
         self.results_df["simulation_cpu_time"] = [sum(simulation_cpu_time_dict.values())]
         self.results_df["system_cpu_time"] = [sum(system_cpu_time_dict.values())]
@@ -1370,6 +1368,7 @@ class CmdVel:
             self.results_df["mean_cmd_vel_rotation"] = [float(np.mean(rotation_cmds))]
             self.results_df[f"{self.metric_name}_version"] = [self.version]
         return True
+
 
 class NormalizedCurvature:
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
