@@ -664,8 +664,9 @@ class BenchmarkRun(object):
         roscore.shutdown()
         self.log(event="components_shutdown")
 
-        with open(self.run_completed_file_path, 'w') as _:
-            pass
+        if not self.aborted:
+            with open(self.run_completed_file_path, 'w') as _:
+                pass
 
         self.log(event="run_end")
 
