@@ -10,6 +10,7 @@ write_estimated_poses_period: 0.1
 scan_topic: /scan
 cmd_vel_topic: /cmd_vel
 odom_topic: /odom
+pedestrians_poses_topic: /pedsim_simulator/simulated_agents
 ground_truth_pose_topic: /base_footprint_gt
 goal_pose_topic: /supervisor_goal_pose
 navigation_transition_event_topic: /bt_navigator/transition_event

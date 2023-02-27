@@ -18,6 +18,7 @@ from move_base_msgs.msg import MoveBaseGoal, MoveBaseAction
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, Pose, Quaternion, PoseStamped, PoseWithCovarianceStamped
 from sensor_msgs.msg import LaserScan
+from pedsim_msgs.msg import AgentStates
 
 import copy
 import pickle
@@ -74,6 +75,7 @@ class LocalPlanningBenchmarkSupervisor:
         ground_truth_pose_topic = rospy.get_param('~ground_truth_pose_topic')
         estimated_pose_correction_topic = rospy.get_param('~estimated_pose_correction_topic')
         goal_pose_topic = rospy.get_param('~goal_pose_topic')
+        pedestrians_poses_topic = rospy.get_param('~pedestrians_poses_topic')
         self.navigate_to_pose_action = rospy.get_param('~navigate_to_pose_action')
         self.navigate_to_pose_topic = rospy.get_param('~navigate_to_pose_topic')
         self.fixed_frame = rospy.get_param('~fixed_frame')
@@ -127,6 +129,7 @@ class LocalPlanningBenchmarkSupervisor:
         self.odom_file_path = path.join(self.benchmark_data_folder, "odom.csv")
         self.ground_truth_poses_file_path = path.join(self.benchmark_data_folder, "ground_truth_poses.csv")
         self.cmd_vel_file_path = path.join(self.benchmark_data_folder, "cmd_vel.csv")
+        self.pedestrian_poses_file_path = path.join(self.benchmark_data_folder, "pedestrian_poses.csv")
         self.scans_file_path = path.join(self.benchmark_data_folder, "scans.csv")
         self.run_events_file_path = path.join(self.benchmark_data_folder, "run_events.csv")
         self.run_data_file_path = path.join(self.benchmark_data_folder, "run_data.yaml")
@@ -138,6 +141,7 @@ class LocalPlanningBenchmarkSupervisor:
         self.odom_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
         self.ground_truth_poses_df = pd.DataFrame(columns=['t', 'x', 'y', 'theta', 'v_x', 'v_y', 'v_theta'])
         self.cmd_vel_df = pd.DataFrame(columns=['t', 'linear_x', 'linear_y', 'linear_z', 'angular_x', 'angular_y', 'angular_z'])
+        self.pedestrian_poses_df = pd.DataFrame()
         self.run_data = dict()
 
         # setup timers
@@ -160,7 +164,8 @@ class LocalPlanningBenchmarkSupervisor:
         rospy.Subscriber(estimated_pose_correction_topic, PoseWithCovarianceStamped, self.estimated_pose_correction_callback, queue_size=1)
         rospy.Subscriber(odom_topic, Odometry, self.odom_callback, queue_size=1)
         rospy.Subscriber(ground_truth_pose_topic, Odometry, self.ground_truth_pose_callback, queue_size=1)
-
+        rospy.Subscriber(pedestrians_poses_topic, AgentStates, self.pedestrian_poses_callback, queue_size=1)
+        
         # setup action clients
         self.navigate_to_pose_action_client = SimpleActionClient(self.navigate_to_pose_action, MoveBaseAction)
 
@@ -373,6 +378,7 @@ class LocalPlanningBenchmarkSupervisor:
         self.odom_df.to_csv(self.odom_file_path, index=False)
         self.ground_truth_poses_df.to_csv(self.ground_truth_poses_file_path, index=False)
         self.cmd_vel_df.to_csv(self.cmd_vel_file_path, index=False)
+        self.pedestrian_poses_df.to_csv(self.pedestrian_poses_file_path, index=False)
 
         with open(self.run_data_file_path, 'w') as run_data_file:
             yaml.dump(self.run_data, run_data_file)
@@ -450,6 +456,28 @@ class LocalPlanningBenchmarkSupervisor:
             'cov_y_y': covariance_mat[1, 1],
             'cov_theta_theta': covariance_mat[5, 5]
         }, ignore_index=True)
+
+    def pedestrian_poses_callback(self, agent_states_msg):
+        if not self.run_started:
+            return
+
+        agent_states_list = agent_states_msg.agent_states
+
+        dataframe_row = dict()
+        dataframe_row['t'] = agent_states_msg.header.stamp.to_sec()
+
+        for i, agent_state in enumerate(agent_states_list):
+            
+            orientation = agent_state.pose.orientation
+            theta, _, _ = pyquaternion.Quaternion(x=orientation.x, y=orientation.y, z=orientation.z, w=orientation.w).yaw_pitch_roll
+
+            dataframe_row[f'x_{i}'] = agent_state.pose.position.x
+            dataframe_row[f'y_{i}'] = agent_state.pose.position.y
+            dataframe_row[f'theta_{i}'] = theta
+
+        self.pedestrian_poses_df = self.pedestrian_poses_df.append(dataframe_row, ignore_index=True)
+
+
 
     def odom_callback(self, odometry_msg):
         #if self.goal_publication_type == 'topic': return
@@ -534,4 +562,5 @@ class LocalPlanningBenchmarkSupervisor:
         except IOError as e:
             rospy.logerr("write_event: could not write event to run_events_file: {event_string}".format(event_string=event_string))
             rospy.logerr(e)
+
 
