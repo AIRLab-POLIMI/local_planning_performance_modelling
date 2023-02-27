@@ -5,11 +5,12 @@
     <arg name="topics" default="-a"/>
     <arg name="output" default="screen"/>
 
+	escludi pedsim 
 	<node
 	    name="$(anon recorder)"
 	    pkg="rosbag"
 	    type="record"
-	    args="--lz4 -O $(arg recorder_output_path) $(arg topics)"
+	    args="--lz4 -O $(arg recorder_output_path) $(arg topics) -x /pedsim_visualizer/(.*)|/pedsim_simulator/simulated_walls|/pedsim_simulator/robot_position"
 	    output="$(arg output)"/>
 
 </launch>
