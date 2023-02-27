@@ -79,7 +79,7 @@ USER $user_name:$user_group
 RUN mkdir -p ~/w/catkin_ws/src
 RUN \
   cd ~/w/catkin_ws/src && \
-  git clone --branch=1.0.1  https://github.com/AIRLab-POLIMI/performance_modelling.git && \
+  git clone --branch=1.0.2  https://github.com/AIRLab-POLIMI/performance_modelling.git && \
   git clone --branch=noetic-devel https://github.com/AIRLab-POLIMI/local_planning_performance_modelling.git && \
   git clone --branch=local-planning-performance-modelling-noetic https://github.com/AIRLab-POLIMI/gazebo_ros_pkgs.git && \
   git clone --depth 1 --branch=local-planning-performance-modelling-noetic https://github.com/AIRLab-POLIMI/arena-rosnav-3D.git && \
@@ -93,7 +93,7 @@ RUN \
 
 RUN \
   pip3 install --extra-index-url https://rospypi.github.io/simple/ rospy rosbag tf tf2_ros --ignore-installed \
-  && pip3 install pyquaternion==0.9.9 networkx==3.0 scikit-learn==1.2.1 scikit-image==0.19.3 pandas==0.25.3 numpy==1.19.2 scipy==1.3.3 pillow==8.3.2
+  && pip3 install pyquaternion==0.9.9 networkx==3.0 scikit-learn==1.2.1 scikit-image==0.19.3 pandas==0.25.3 numpy==1.19.2 scipy==1.3.3 pillow==8.3.2 psutil==5.9.4
 
 # install python packages for arena
 RUN pip3 install pyyaml catkin_pkg gym netifaces pathlib filelock pyqt5 mpi4py torch lxml defusedxml 
