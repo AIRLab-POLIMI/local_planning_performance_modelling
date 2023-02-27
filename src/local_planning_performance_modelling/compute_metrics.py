@@ -59,16 +59,24 @@ def compute_run_metrics(run_output_folder):
         MotionCharacteristics(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         CmdVel(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
-        Dispersion(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         NormalizedCurvature(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent)
     ]
 
     success = True
     for m in metrics_to_compute:
+        if print_timings:
+            start_time = datetime.now()
         if not m.compute():
+            print(print_timings)
+            if print_timings:
+                print(f"{m.metric_name:<200}{datetime.now() - start_time}")
             success = False
             print_error(f"compute_run_metrics: failed metrics computation for run {run_output_folder}")
             break
+        else:
+            if print_timings:
+                print(f"{m.metric_name:<200}\t{datetime.now() - start_time}")
+
 
     # write the metrics data frame to file
     results_df.to_csv(metrics_result_file_path, index=False)
@@ -130,6 +138,11 @@ def main():
                         action='store_true',
                         required=False)
 
+    parser.add_argument('-t', dest='print_timings',
+                        help='When set, print timing of each metric (set num_parallel_threads to 1 t avoid parallel prints).',
+                        action='store_true',
+                        required=False)
+
     args = parser.parse_args()
 
     if args.output_dir_path is None:
@@ -166,6 +179,9 @@ def main():
     shared_num_runs = multiprocessing.Value('i', len(run_folders))
     global silent
     silent = args.silent
+    global print_timings
+    print_timings = args.print_timings
+    print(print_timings)
     global recompute_all_metrics
     recompute_all_metrics = args.recompute_all_metrics
 
@@ -203,6 +219,7 @@ def main():
 
 
 silent = False
+print_timings = False
 recompute_all_metrics = False
 shared_progress = multiprocessing.Value('i', 0)
 shared_num_runs = multiprocessing.Value('i', 0)
