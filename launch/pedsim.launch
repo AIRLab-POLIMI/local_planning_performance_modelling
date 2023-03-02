@@ -16,6 +16,8 @@
     <arg name="update_rate" default="25.0"/> <!-- Hz -->
     <arg name="spawn_period" default="5.0"/>
 
+    <param name="/use_sim_time" value="true"/>
+
       <node name="pedsim_simulator" pkg="pedsim_simulator" type="pedsim_simulator" output="screen">
         <param name="scene_file" value="$(arg scene_file)" type="string"/>
         <param name="pedestrian_number" value="$(arg pedestrian_number)" type="int"/>
