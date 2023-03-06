@@ -169,8 +169,9 @@ complete -F _complete_alias rcd
 alias ust='rosparam set use_sim_time true'
 
 # ROS1 execute benchmark ignore previous runs
-alias test_run='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_first.yaml --ignore-previous-runs'
-complete -F _complete_alias test_run
+alias test_run='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_test.yaml --rviz --ignore-previous-runs -r ~/ds/performance_modelling/output/local_planning_test_runs'
 
-alias runs='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_first.yaml'
-complete -F _complete_alias runs
+alias runs_all='rosrun local_planning_performance_modelling execute_grid_benchmark.py -a ~/ds_alt/performance_modelling/output'
+
+alias runs_teb='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_teb.yaml -a ~/ds_alt/performance_modelling/output'
+

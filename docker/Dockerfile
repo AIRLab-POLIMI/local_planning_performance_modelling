@@ -107,6 +107,7 @@ RUN \
 
 RUN mkdir -p ~/.ros/log
 RUN mkdir -p ~/ds/performance_modelling
+RUN mkdir -p ~/ds_alt/performance_modelling
 RUN \
   cd ~/ds/performance_modelling && \
   git clone --depth 1 --branch=local-planning-ROS1-new https://github.com/AIRLab-POLIMI/performance_modelling_test_datasets.git test_datasets && \

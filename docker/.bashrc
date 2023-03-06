@@ -142,6 +142,8 @@ clear
 sudo chown `id -u`:`id -g` ~/ds/performance_modelling/
 sudo chown `id -u`:`id -g` ~/ds/performance_modelling/output
 sudo chown `id -u`:`id -g` ~/.ros/log/
+sudo chown `id -u`:`id -g` ~/ds_alt/performance_modelling/
+sudo chown `id -u`:`id -g` ~/ds_alt/performance_modelling/output
 
 cd ~
 
