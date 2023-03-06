@@ -410,7 +410,7 @@ class Clearance:
         scans_df = pd.read_csv(self.scans_file_path, engine='python', sep=', ')
 
         clearance_list = list()
-        points_clearance_list = list()
+        
         for i, scan_row in scans_df.iterrows():
             laser_scan_msg = LaserScan()
             laser_scan_msg.angle_min = float(scan_row[1])
@@ -423,12 +423,15 @@ class Clearance:
                 warnings.simplefilter("ignore")
                 pointcloud_msg = LaserProjection().projectLaser(laser_scan_msg)
             point_generator = pc2.read_points(pointcloud_msg)
+            points_clearance_list = list()
             for point_pc2 in point_generator:
                 if not np.isnan(point_pc2[0]):
                     point = shp.Point(point_pc2[0] + base_scan_x_offset, point_pc2[1] + base_scan_y_offset)
                     dist = point.distance(footprint_polygon) if not footprint_polygon.contains(point) else 0.0
                     points_clearance_list.append(dist)
-            clearance_list.append(np.min(points_clearance_list))
+
+            if (len(points_clearance_list) > 0): # compute the min only if the list is not empty
+                clearance_list.append(np.min(points_clearance_list))
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df['minimum_clearance'] = [float(np.min(clearance_list))]
@@ -445,7 +448,7 @@ class CpuTimeAndMaxMemoryUsage:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
-        self.version = 3
+        self.version = 4
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -490,24 +493,36 @@ class CpuTimeAndMaxMemoryUsage:
                 continue
             for process_info in ps_snapshot:
                 process_name = process_info['name']
-                if process_name not in ['gzserver', 'gzclient', 'rviz2', 'rviz', 'local_planning_', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # ignore simulator and rviz to count the robot system memory
-                    system_cpu_time_dict[process_name] = max(
-                        system_cpu_time_dict[process_name],
-                        process_info['cpu_times'].user + process_info['cpu_times'].system
-                    )
-                    system_max_memory_dict[process_name] = max(
-                        system_max_memory_dict[process_name],
-                        process_info['memory_full_info'].pss
-                    )
+                if process_name is None:
+                    print_info(f"{self.metric_name}: found process {process_name}. Aborting.\n")
+                    return True
+                if process_name in ['gzserver', 'gzclient', 'rviz', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # consider simulator and rviz to count the robot system memory
+                    if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
+                        simulation_cpu_time_dict[process_name] = max(
+                            simulation_cpu_time_dict[process_name],
+                            process_info['cpu_times'].user + process_info['cpu_times'].system
+                        )
+                        simulation_max_memory_dict[process_name] = max(
+                            simulation_max_memory_dict[process_name],
+                            process_info['memory_full_info'].pss
+                        )
+                    else:
+                        print_error(f"{self.metric_name}: Could not load 'cpu_times' or 'memory_full_info' for process {process_info}. Pickle file:\n{ps_snapshot_path}")
+                        break
                 else:
-                    simulation_cpu_time_dict[process_name] = max(
-                        simulation_cpu_time_dict[process_name],
-                        process_info['cpu_times'].user + process_info['cpu_times'].system
-                    )
-                    simulation_max_memory_dict[process_name] = max(
-                        simulation_max_memory_dict[process_name],
-                        process_info['memory_full_info'].pss
-                    )
+                    if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
+                        system_cpu_time_dict[process_name] = max(
+                            system_cpu_time_dict[process_name],
+                            process_info['cpu_times'].user + process_info['cpu_times'].system
+                        )
+                        system_max_memory_dict[process_name] = max(
+                            system_max_memory_dict[process_name],
+                            process_info['memory_full_info'].pss
+                        )
+                    else:
+                        print_error(f"{self.metric_name}: Could not load 'cpu_times' or 'memory_full_info' for process {process_info}. Pickle file:\n{ps_snapshot_path}")
+                        break
+                    
 
         if len(system_cpu_time_dict) == 0 or len(system_max_memory_dict) == 0:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
@@ -517,7 +532,7 @@ class CpuTimeAndMaxMemoryUsage:
         self.results_df["simulation_cpu_time"] = [sum(simulation_cpu_time_dict.values())]
         self.results_df["system_cpu_time"] = [sum(system_cpu_time_dict.values())]
 
-        self.results_df["move_base_max_memory"] = [system_max_memory_dict["movebase"]]
+        self.results_df["move_base_max_memory"] = [system_max_memory_dict["move_base"]]
         self.results_df["simulation_max_memory"] = [sum(simulation_max_memory_dict.values())]
         self.results_df["system_max_memory"] = [sum(system_max_memory_dict.values())]
 
@@ -1451,3 +1466,111 @@ class NormalizedCurvature:
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [float(normalized_curvature)]
         return True
+
+
+class PedestrianEncounters:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.run_output_folder = run_output_folder  #TODO  cancella
+        self.results_df = results_df
+        self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
+        self.pedestrian_poses_file_path = path.join(run_output_folder, "benchmark_data", "pedestrian_poses.csv")
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "pedestrian_encounters"
+        self.version = np.nan
+        self.th_high = 3.0 
+        self.th_low = 1.5
+
+    def compute(self):
+
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
+
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df["pedestrian_encounters"] = [np.nan]
+
+        # check required files exist
+        if not path.isfile(self.ground_truth_poses_file_path):
+            print_error(f"{self.metric_name}: ground_truth_poses file not found:\n{self.ground_truth_poses_file_path}")
+            return False
+        
+        if not path.isfile(self.pedestrian_poses_file_path):
+            print_error(f"{self.metric_name}: pedestrian_poses file not found:\n{self.pedestrian_poses_file_path}")
+            return False
+        
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            return False
+        
+        # get timestamps info from run events
+        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
+        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
+        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
+        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
+
+        if len(navigation_start_events) != 1:
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        navigation_start_time = navigation_start_events.iloc[0].t
+        navigation_end_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
+
+        # get the dataframes for ground truth poses
+        ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
+        ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
+
+        # get the dataframes for pedestrian_poses
+        pedestrian_poses_df = pd.read_csv(self.pedestrian_poses_file_path)
+        if len(pedestrian_poses_df) == 0:
+            print_info(f"{self.metric_name}: not enough pedestrian poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.odometry_poses_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        # variable holding number of encounters between robot and every pedestrian
+        encounter_count = 0
+
+        # compute number of columns in the dataframe to retrieve the number of pedestrians
+        num_pedestrians = int((len(pedestrian_poses_df.columns) - 1) / 3)
+        
+        # compute the interpolated ground truth poses for each pedestrian
+        for i in range(num_pedestrians):
+            # build an interpolated dataframe in the form [t, x_robot, y_robot, x_ped, y_ped]
+            pedestrian_i_df = pedestrian_poses_df[['t', f'x_{i}', f'y_{i}', f'theta_{i}']].copy()
+            
+            pedestrian_i_df.rename(columns={f'x_{i}': 'x', f'y_{i}': 'y', f'theta_{i}': 'theta'}, inplace=True)
+
+            interpolated_df = interpolate_pose_2d_trajectories(
+                trajectory_a_df=ground_truth_poses_df, trajectory_a_label='robot',
+                trajectory_b_df=pedestrian_i_df, trajectory_b_label='ped',
+                limit_trajectory_a_rate=False, interpolation_tolerance=0.1
+            )
+
+            # array holding all the distances between pedestrian_i and the robot
+            distance_array = np.sqrt( ( interpolated_df['x_robot'] - interpolated_df['x_ped'])**2 + (interpolated_df['y_robot'] - interpolated_df['y_ped'])**2 ) # returns a np.array
+            
+            # boolean variable representing an encounter between pedestrian_i and robot.
+            is_encountering = False
+            for dist in distance_array:
+                # when the distance is below a predefined threshold_low and no other encounter was made before, then the pedestrian is in the range of the robot, hence an encounter is happening.
+                if dist < self.th_low and not is_encountering:
+                    is_encountering = True
+                    encounter_count += 1
+                # when the distance is higher than a predefined threshold_high and an encounter was made before, then the pedestrian is not anymore in range of the robot, hence stop considering it an encounter anymore.
+                if not dist < self.th_high and is_encountering:
+                    is_encountering = False
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df["pedestrian_encounters"] = [int(encounter_count)]
+        return True
+
+

@@ -17,7 +17,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from performance_modelling_py.utils import print_info, print_error
-from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, CollisionlessLocalizationError, LocalizationUpdateRate, CollisionRate, Clearance, MotionCharacteristics, CmdVel, Dispersion, NormalizedCurvature
+from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, CollisionlessLocalizationError, LocalizationUpdateRate, CollisionRate, Clearance, MotionCharacteristics, CmdVel, NormalizedCurvature, PedestrianEncounters
 
 
 def compute_run_metrics(run_output_folder):
@@ -59,7 +59,8 @@ def compute_run_metrics(run_output_folder):
         MotionCharacteristics(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         CmdVel(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
-        NormalizedCurvature(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent)
+        NormalizedCurvature(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        PedestrianEncounters(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent)
     ]
 
     success = True
@@ -67,9 +68,6 @@ def compute_run_metrics(run_output_folder):
         if print_timings:
             start_time = datetime.now()
         if not m.compute():
-            print(print_timings)
-            if print_timings:
-                print(f"{m.metric_name:<200}{datetime.now() - start_time}")
             success = False
             print_error(f"compute_run_metrics: failed metrics computation for run {run_output_folder}")
             break
@@ -181,7 +179,6 @@ def main():
     silent = args.silent
     global print_timings
     print_timings = args.print_timings
-    print(print_timings)
     global recompute_all_metrics
     recompute_all_metrics = args.recompute_all_metrics
 

@@ -67,7 +67,9 @@ class BenchmarkRun(object):
         local_planner_node = self.run_parameters['local_planner_node']
         global_planner_node = self.run_parameters['global_planner_node']
         min_turning_radius = self.run_parameters['min_turning_radius'] if 'min_turning_radius' in self.run_parameters else None
-        #max_samples = self.run_parameters['max_samples'] if 'min_turning_radius' in self.run_parameters else None   # used only for teb
+        #max_samples = self.run_parameters['max_samples'] if 'max_samples' in self.run_parameters else None   # used only for teb
+        include_costmap_obstacles = self.run_parameters['include_costmap_obstacles'] if 'include_costmap_obstacles' in self.run_parameters else None
+        include_dynamic_obstacles = self.run_parameters['include_dynamic_obstacles'] if 'include_dynamic_obstacles' in self.run_parameters else None
         alpha_1, alpha_2, alpha_3, alpha_4 = self.run_parameters['odometry_error']
         pedestrian_number = self.run_parameters['pedestrian_number']
 
@@ -240,6 +242,8 @@ class BenchmarkRun(object):
                 local_planner_configuration['TebLocalPlannerROS']['footprint_model'] = {'type': "polygon", 'vertices': turtlebot_footprint}  # TEB does not accept the footprint in the form of a string 
                 local_planner_configuration['TebLocalPlannerROS']['wheelbase'] = turtlebot_wheelbase
                 local_planner_configuration['TebLocalPlannerROS']['min_turning_radius'] = min_turning_radius
+                local_planner_configuration['TebLocalPlannerROS']['include_costmap_obstacles'] = include_costmap_obstacles
+                local_planner_configuration['TebLocalPlannerROS']['include_dynamic_obstacles'] = include_dynamic_obstacles
         #        local_planner_configuration['TebLocalPlannerROS']['max_samples'] = max_samples
         #     elif robot_model == 'hunter2':
         #         local_planner_configuration['controller_server']['ros__parameters']['FollowPath']['cmd_angle_instead_rotvel'] = True

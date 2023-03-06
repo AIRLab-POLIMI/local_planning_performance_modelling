@@ -51,7 +51,7 @@ def main():
                         default=default_benchmark_configuration,
                         required=False)
 
-    default_base_run_folder = "~/ds/performance_modelling/output/test_local_planning/"
+    default_base_run_folder = "~/ds/performance_modelling/output/local_planning/"
     parser.add_argument('-r', dest='base_run_folder',
                         help='Folder in which the result of each run will be placed. Defaults to {default_base_run_folder}'.format(default_base_run_folder=default_base_run_folder),
                         type=str,
