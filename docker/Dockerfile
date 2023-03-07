@@ -89,7 +89,7 @@ RUN \
 RUN \
   . /opt/ros/noetic/setup.sh && \
   cd ~/w/catkin_ws && \
-  catkin_make -j 2
+  catkin_make -j 16
 
 RUN \
   pip3 install --extra-index-url https://rospypi.github.io/simple/ rospy rosbag tf tf2_ros --ignore-installed \
