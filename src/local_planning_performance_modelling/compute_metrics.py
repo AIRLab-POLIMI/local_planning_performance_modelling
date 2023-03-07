@@ -104,7 +104,7 @@ def parallel_compute_metrics(run_output_folder):
 
 
 def main():
-    default_base_run_folder = "~/ds/performance_modelling/output/test_local_planning/*"
+    default_base_run_folder = "~/ds/performance_modelling/output/local_planning/*"
     default_num_parallel_threads = 16
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description='Compute metrics for run directories in parallel.')
 
@@ -117,6 +117,13 @@ def main():
                         help=f'Folder in which the result of each run will be placed. Defaults to {default_base_run_folder}.',
                         type=str,
                         default=default_base_run_folder,
+                        required=False)
+    
+    default_alternative_base_run_folder = path.expanduser('~/ds_alt/performance_modelling/output/local_planning/*')
+    parser.add_argument('-a', dest='alternative_base_run_folder',
+                        help='Alternative folder in which the result of each run will be placed. Additionally to the base_run_folder. Defaults to {alternative_base_run_folder}.',
+                        type=str,
+                        default=default_alternative_base_run_folder,
                         required=False)
 
     parser.add_argument('-o', dest='output_dir_path',
@@ -159,7 +166,12 @@ def main():
     def is_not_completed_run_folder(p):
         return path.isdir(p) and not path.exists(path.join(p, "RUN_COMPLETED"))
 
-    run_folders = sorted(list(filter(is_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
+    normal_run_folders = set(glob.glob(path.expanduser(args.base_run_folder)))
+    alternative_run_folders = (glob.glob(path.expanduser(args.alternative_base_run_folder)))
+    all_run_folders = list(normal_run_folders.union(alternative_run_folders))
+    print(all_run_folders)
+
+    run_folders = sorted(list(filter(is_completed_run_folder, all_run_folders)))
     not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
 
     if len(run_folders) == 0:

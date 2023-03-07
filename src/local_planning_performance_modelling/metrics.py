@@ -1442,11 +1442,11 @@ class NormalizedCurvature:
 
         curvature = 0
         # number of (x,y) points in the table
-        point_size = len(ground_truth_positions)
+        sample_size = len(ground_truth_positions)
 
-        if(point_size > 2):
+        if(sample_size > 2):
             # if path has more than 2 points then consider a triplet of contiguous points (p1,p2,p3) and compute the internal angle adjacent to p2 
-            for i in range(point_size-2):
+            for i in range(sample_size-2):
                 p1 = ground_truth_positions[i]
                 p2 = ground_truth_positions[i+1]
                 p3 = ground_truth_positions[i+2]
@@ -1461,7 +1461,7 @@ class NormalizedCurvature:
                     continue
                 curvature += angle
         
-        normalized_curvature = curvature / point_size
+        normalized_curvature = curvature / sample_size
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [float(normalized_curvature)]
@@ -1470,15 +1470,15 @@ class NormalizedCurvature:
 
 class PedestrianEncounters:
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.run_output_folder = run_output_folder  #TODO  cancella
         self.results_df = results_df
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.pedestrian_poses_file_path = path.join(run_output_folder, "benchmark_data", "pedestrian_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.run_info_path = path.join(run_output_folder, "run_info.yaml")
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "pedestrian_encounters"
-        self.version = np.nan
+        self.version = 4
         self.th_high = 3.0 
         self.th_low = 1.5
 
@@ -1506,6 +1506,15 @@ class PedestrianEncounters:
             print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
             return False
         
+        with open(self.run_info_path) as run_info_file:
+            run_info = yaml.safe_load(run_info_file)
+        num_pedestrians = run_info['run_parameters']['pedestrian_number']
+
+        if num_pedestrians == 0:
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            self.results_df["pedestrian_encounters"] = [0]
+            return True
+
         # get timestamps info from run events
         run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
         navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
@@ -1529,8 +1538,13 @@ class PedestrianEncounters:
         ground_truth_poses_df = pd.read_csv(self.ground_truth_poses_file_path)
         ground_truth_poses_df = ground_truth_poses_df[(navigation_start_time <= ground_truth_poses_df.t) & (ground_truth_poses_df.t <= navigation_end_time)]
 
-        # get the dataframes for pedestrian_poses
-        pedestrian_poses_df = pd.read_csv(self.pedestrian_poses_file_path)
+        # get the dataframes for pedestrian poses
+        try:
+            pedestrian_poses_df = pd.read_csv(self.pedestrian_poses_file_path)
+        except pd.errors.EmptyDataError as e:
+            print_error(f"{self.metric_name}: pedestrian_poses file is emty:\n{self.pedestrian_poses_file_path}")
+            return False
+
         if len(pedestrian_poses_df) == 0:
             print_info(f"{self.metric_name}: not enough pedestrian poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.odometry_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
@@ -1539,14 +1553,10 @@ class PedestrianEncounters:
         # variable holding number of encounters between robot and every pedestrian
         encounter_count = 0
 
-        # compute number of columns in the dataframe to retrieve the number of pedestrians
-        num_pedestrians = int((len(pedestrian_poses_df.columns) - 1) / 3)
-        
         # compute the interpolated ground truth poses for each pedestrian
         for i in range(num_pedestrians):
             # build an interpolated dataframe in the form [t, x_robot, y_robot, x_ped, y_ped]
             pedestrian_i_df = pedestrian_poses_df[['t', f'x_{i}', f'y_{i}', f'theta_{i}']].copy()
-            
             pedestrian_i_df.rename(columns={f'x_{i}': 'x', f'y_{i}': 'y', f'theta_{i}': 'theta'}, inplace=True)
 
             interpolated_df = interpolate_pose_2d_trajectories(
@@ -1556,9 +1566,9 @@ class PedestrianEncounters:
             )
 
             # array holding all the distances between pedestrian_i and the robot
-            distance_array = np.sqrt( ( interpolated_df['x_robot'] - interpolated_df['x_ped'])**2 + (interpolated_df['y_robot'] - interpolated_df['y_ped'])**2 ) # returns a np.array
+            distance_array = np.sqrt( ( interpolated_df['x_robot'] - interpolated_df['x_ped'])**2 + (interpolated_df['y_robot'] - interpolated_df['y_ped'])**2 ) 
             
-            # boolean variable representing an encounter between pedestrian_i and robot.
+            # boolean variable representing an encounter between pedestrian_i and robot
             is_encountering = False
             for dist in distance_array:
                 # when the distance is below a predefined threshold_low and no other encounter was made before, then the pedestrian is in the range of the robot, hence an encounter is happening.
