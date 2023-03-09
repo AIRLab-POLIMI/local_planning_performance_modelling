@@ -173,5 +173,9 @@ alias test_run='rosrun local_planning_performance_modelling execute_grid_benchma
 
 alias runs_all='rosrun local_planning_performance_modelling execute_grid_benchmark.py -a ~/ds_alt/performance_modelling/output'
 
+alias runs_all_2='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_all_2.yaml -a ~/ds_alt/performance_modelling/output'
+
 alias runs_teb='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_teb.yaml -a ~/ds_alt/performance_modelling/output'
+
+alias runs_teb_2='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_teb_2.yaml -a ~/ds_alt/performance_modelling/output'
 
