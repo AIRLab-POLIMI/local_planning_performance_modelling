@@ -10,7 +10,7 @@
 	    name="$(anon recorder)"
 	    pkg="rosbag"
 	    type="record"
-	    args="--lz4 -O $(arg recorder_output_path) $(arg topics) -x /pedsim_visualizer/(.*)|/pedsim_simulator/simulated_walls|/pedsim_simulator/robot_position"
+	    args="--lz4 -O $(arg recorder_output_path) $(arg topics) -x /pedsim_visualizer/(.*)|/pedsim_simulator/simulated_walls|/pedsim_simulator/robot_position|/sdf_map/esdf_static"
 	    output="$(arg output)"/>
 
 </launch>

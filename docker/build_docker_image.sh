@@ -10,6 +10,6 @@ sudo docker build \
   --build-arg user_name="$USER_NAME" \
   --build-arg user_gid="$USER_GID" \
   --build-arg user_group="$USER_GROUP" \
+  --no-cache \
   -t "$USER_NAME"/local_planning_performance_modelling_noetic_full:v3 .
 
-#--no-cache \
