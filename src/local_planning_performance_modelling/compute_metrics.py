@@ -169,7 +169,7 @@ def main():
     normal_run_folders = set(glob.glob(path.expanduser(args.base_run_folder)))
     alternative_run_folders = (glob.glob(path.expanduser(args.alternative_base_run_folder)))
     all_run_folders = list(normal_run_folders.union(alternative_run_folders))
-    print(all_run_folders)
+    #print(all_run_folders)  #TODO rimuovi
 
     run_folders = sorted(list(filter(is_completed_run_folder, all_run_folders)))
     not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))

@@ -448,7 +448,7 @@ class CpuTimeAndMaxMemoryUsage:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
-        self.version = 4
+        self.version = 6
 
     def compute(self):
         # Do not recompute the metric if it was already computed with the same version
@@ -496,32 +496,28 @@ class CpuTimeAndMaxMemoryUsage:
                 if process_name is None:
                     print_info(f"{self.metric_name}: found process {process_name}. Aborting.\n")
                     return True
-                if process_name in ['gzserver', 'gzclient', 'rviz', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # consider simulator and rviz to count the robot system memory
-                    if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
-                        simulation_cpu_time_dict[process_name] = max(
-                            simulation_cpu_time_dict[process_name],
-                            process_info['cpu_times'].user + process_info['cpu_times'].system
-                        )
-                        simulation_max_memory_dict[process_name] = max(
-                            simulation_max_memory_dict[process_name],
-                            process_info['memory_full_info'].pss
-                        )
+                if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
+                    if process_name in ['gzserver', 'gzclient', 'rviz', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # consider simulator and rviz to count the robot system memory. python is the name of 2 processes: the supervisor and spawn_pedsim_agents
+                            simulation_cpu_time_dict[process_name] = max(
+                                simulation_cpu_time_dict[process_name],
+                                process_info['cpu_times'].user + process_info['cpu_times'].system
+                            )
+                            simulation_max_memory_dict[process_name] = max(
+                                simulation_max_memory_dict[process_name],
+                                process_info['memory_full_info'].pss
+                            )
                     else:
-                        print_error(f"{self.metric_name}: Could not load 'cpu_times' or 'memory_full_info' for process {process_info}. Pickle file:\n{ps_snapshot_path}")
-                        break
+                        if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
+                            system_cpu_time_dict[process_name] = max(
+                                system_cpu_time_dict[process_name],
+                                process_info['cpu_times'].user + process_info['cpu_times'].system
+                            )
+                            system_max_memory_dict[process_name] = max(
+                                system_max_memory_dict[process_name],
+                                process_info['memory_full_info'].pss
+                            )
                 else:
-                    if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
-                        system_cpu_time_dict[process_name] = max(
-                            system_cpu_time_dict[process_name],
-                            process_info['cpu_times'].user + process_info['cpu_times'].system
-                        )
-                        system_max_memory_dict[process_name] = max(
-                            system_max_memory_dict[process_name],
-                            process_info['memory_full_info'].pss
-                        )
-                    else:
-                        print_error(f"{self.metric_name}: Could not load 'cpu_times' or 'memory_full_info' for process {process_info}. Pickle file:\n{ps_snapshot_path}")
-                        break
+                    pass  # sometimes this happens when the process terminates in the previous snapshot
                     
 
         if len(system_cpu_time_dict) == 0 or len(system_max_memory_dict) == 0:
