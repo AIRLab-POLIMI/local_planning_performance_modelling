@@ -55,6 +55,7 @@ combinatorial_parameters: [
     global_planner_node: *id007,
     available_cpu_threads: *id008,
     pedestrian_number: [0],
+    arena_new_timeout: [0]
   },
 
   {
@@ -107,5 +108,6 @@ combinatorial_parameters: [
     available_cpu_threads: *id008,
     pedestrian_number: *pedestrian_number, 
     pedestrian_max_vel: *pedestrian_max_vel,
+    arena_new_timeout: [0]
   }
 ]

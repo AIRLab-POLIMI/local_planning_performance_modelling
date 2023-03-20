@@ -5,6 +5,8 @@ goal_tolerance: 0.4
 run_timeout: 600.0
 ps_snapshot_period: 1.0
 write_estimated_poses_period: 0.1
+robot_stuck_threshold_distance: 0.2
+robot_stuck_timeout: 60   # seconds
 
 # topic names
 scan_topic: /scan
