@@ -6,7 +6,7 @@ amcl_alpha_factor: &id005 [1.0]
 localization_node: &id006 [amcl]
 global_planner_node: &id007 [global_planner]
 available_cpu_threads: &id008 [8] 
-pedestrian_number: &pedestrian_number [5, 100]
+pedestrian_number: &pedestrian_number [5, 20]
 pedestrian_max_vel: &pedestrian_max_vel [0.3, 0.6]
 
 combinatorial_parameters: [
