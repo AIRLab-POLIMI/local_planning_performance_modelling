@@ -1389,7 +1389,7 @@ class NormalizedCurvature:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "normalized_curvature"
-        self.version = 1
+        self.version = 2
 
 
     def compute(self):
@@ -1451,6 +1451,9 @@ class NormalizedCurvature:
                 delta_y = (p2[1] - p1[1]) * (p3[1] - p2[1])
                 dist_p1_p2 = math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
                 dist_p2_p3 = math.sqrt((p2[0] - p3[0])**2 + (p2[1] - p3[1])**2)
+                if dist_p1_p2 == 0 or dist_p1_p2 == 0:
+                    print_info(f"{self.metric_name}: retrieved a zero distance between two points.")
+                    continue   # if for some reasons two points have 0 distance, skip computation
                 angle = np.arccos((delta_x + delta_y) / (dist_p1_p2 * dist_p2_p3))
                 # if angle is equal to pi then the path is straight, so it makes no sense to compute the curvature
                 if (angle == math.pi):
@@ -1579,4 +1582,57 @@ class PedestrianEncounters:
         self.results_df["pedestrian_encounters"] = [int(encounter_count)]
         return True
 
+class RealTimeFactor:
+    def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
+        self.results_df = results_df
+        self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
+        self.recompute_anyway = recompute_anyway
+        self.verbose = verbose
+        self.metric_name = "real_time_factor"
+        self.version = 3
+    
+    def compute(self):
+        # Do not recompute the metric if it was already computed with the same version
+        if not self.recompute_anyway and \
+                f"{self.metric_name}_version" in self.results_df and \
+                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
+            return True
 
+        # clear fields in case the computation fails so that the old data (from a previous version) will be removed
+        self.results_df['real_time_factor'] = [np.nan]
+
+        # check required files exist
+        if not path.isfile(self.run_events_file_path):
+            print_error(f"{self.metric_name}: run_events file not found:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return False
+        
+        # get timestamps info from run events
+        run_events_df = pd.read_csv(self.run_events_file_path, engine='python', sep=', ')
+        navigation_start_events = run_events_df[run_events_df.event == 'navigation_goal_accepted']
+        navigation_succeeded_events = run_events_df[(run_events_df.event == 'navigation_succeeded')]
+        navigation_failed_events = run_events_df[(run_events_df.event == 'navigation_failed')]
+
+        if len(navigation_start_events) != 1:
+            print_info(f"{self.metric_name}: event navigation_goal_accepted not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        if len(navigation_succeeded_events) + len(navigation_failed_events) != 1:
+            print_info(f"{self.metric_name}: events navigation_succeeded and navigation_failed not in events file:\n{self.run_events_file_path}")
+            self.results_df[f"{self.metric_name}_version"] = [self.version]
+            return True
+
+        navigation_start_ros_time = navigation_start_events.iloc[0].t
+        navigation_end_ros_time = navigation_succeeded_events.iloc[0].t if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].t
+
+        navigation_start_real_time = navigation_start_events.iloc[0].real_time
+        navigation_end_real_time = navigation_succeeded_events.iloc[0].real_time if len(navigation_succeeded_events) == 1 else navigation_failed_events.iloc[0].real_time
+
+        delta_ros_time = navigation_end_ros_time - navigation_start_ros_time
+        delta_real_time = navigation_end_real_time - navigation_start_real_time
+        real_time_factor = delta_ros_time / delta_real_time
+
+        self.results_df[f"{self.metric_name}_version"] = [self.version]
+        self.results_df['real_time_factor'] = [real_time_factor]
+        return True
