@@ -26,6 +26,24 @@ class InterpolationException(Exception):
     pass
 
 
+class Metric:
+    def __init__(self, results_df, recompute_anyway):
+        self.results_df = results_df
+        self.recompute_anyway = recompute_anyway
+        self.metric_name = None
+        self.version = None
+
+    def needs_to_be_computed(self):
+        # A metric needs to be computed if:
+        #   recompute_anyway is True, or
+        #   the metric version is not in the previous results dataframe, or
+        #   the metric version from the previous results dataframe is different from the current one
+        return \
+            self.recompute_anyway or \
+            f"{self.metric_name}_version" not in self.results_df or \
+            self.results_df.iloc[0][f"{self.metric_name}_version"] != self.version
+
+
 def interpolate_pose_2d_trajectories(trajectory_a_df, trajectory_b_df, trajectory_a_label='a', trajectory_b_label='b', average_rate=1.0, interpolation_tolerance=0.1, limit_trajectory_a_rate=True):
     a = trajectory_a_label
     b = trajectory_b_label
@@ -113,22 +131,18 @@ def relative_2d_pose_transform(pose_a_1, pose_a_2, pose_b_1, pose_b_2):
     return x, y, theta
 
 
-class TrajectoryLength:
+class TrajectoryLength(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "trajectory_length"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
@@ -177,21 +191,17 @@ class TrajectoryLength:
         return True
 
 
-class ExecutionTime:
+class ExecutionTime(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "execution_time"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
@@ -226,21 +236,17 @@ class ExecutionTime:
         return True
 
 
-class SuccessRate:
+class SuccessRate(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "success_rate"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
@@ -255,30 +261,25 @@ class SuccessRate:
         navigation_goal_reached_events = run_events_df[run_events_df.event == 'navigation_goal_reached']
 
         navigation_goal_reached = len(navigation_goal_reached_events) == 1
-        #print("ngr: " + str(navigation_goal_reached))
         self.results_df[f"{self.metric_name}_version"] = [self.version]
         self.results_df[self.metric_name] = [int(navigation_goal_reached)]
         return True
 
 
-class CollisionRate:
+class CollisionRate(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
         self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
         self.run_info_path = path.join(run_output_folder, "run_info.yaml")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "collision_rate"
         self.version = 3
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
@@ -349,24 +350,20 @@ class CollisionRate:
         return True
 
 
-class Clearance:
+class Clearance(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
         self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
         self.run_info_path = path.join(run_output_folder, "run_info.yaml")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "clearance"
         self.version = 3
     
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
@@ -430,7 +427,7 @@ class Clearance:
                     dist = point.distance(footprint_polygon) if not footprint_polygon.contains(point) else 0.0
                     points_clearance_list.append(dist)
 
-            if (len(points_clearance_list) > 0): # compute the min only if the list is not empty
+            if len(points_clearance_list) > 0:  # compute the min only if the list is not empty
                 clearance_list.append(np.min(points_clearance_list))
 
         self.results_df[f"{self.metric_name}_version"] = [self.version]
@@ -441,21 +438,17 @@ class Clearance:
         return True
 
 
-class CpuTimeAndMaxMemoryUsage:
+class CpuTimeAndMaxMemoryUsage(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ps_snapshots_folder_path = path.join(run_output_folder, "benchmark_data", "ps_snapshots")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cpu_time_and_max_memory"
         self.version = 6
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["move_base_cpu_time"] = [np.nan]
@@ -497,15 +490,16 @@ class CpuTimeAndMaxMemoryUsage:
                     print_info(f"{self.metric_name}: found process {process_name}. Aborting.\n")
                     return True
                 if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
-                    if process_name in ['gzserver', 'gzclient', 'rviz', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:  # consider simulator and rviz to count the robot system memory. python is the name of 2 processes: the supervisor and spawn_pedsim_agents
-                            simulation_cpu_time_dict[process_name] = max(
-                                simulation_cpu_time_dict[process_name],
-                                process_info['cpu_times'].user + process_info['cpu_times'].system
-                            )
-                            simulation_max_memory_dict[process_name] = max(
-                                simulation_max_memory_dict[process_name],
-                                process_info['memory_full_info'].pss
-                            )
+                    # consider simulator and rviz to count the robot system memory. python is the name of 2 processes: the supervisor and spawn_pedsim_agents
+                    if process_name in ['gzserver', 'gzclient', 'rviz', 'pedsim_simulator', 'pedsim_visualizer_node', 'python', 'record']:
+                        simulation_cpu_time_dict[process_name] = max(
+                            simulation_cpu_time_dict[process_name],
+                            process_info['cpu_times'].user + process_info['cpu_times'].system
+                        )
+                        simulation_max_memory_dict[process_name] = max(
+                            simulation_max_memory_dict[process_name],
+                            process_info['memory_full_info'].pss
+                        )
                     else:
                         if process_info['cpu_times'] is not None and process_info['memory_full_info'] is not None:
                             system_cpu_time_dict[process_name] = max(
@@ -518,7 +512,6 @@ class CpuTimeAndMaxMemoryUsage:
                             )
                 else:
                     pass  # sometimes this happens when the process terminates in the previous snapshot
-                    
 
         if len(system_cpu_time_dict) == 0 or len(system_max_memory_dict) == 0:
             print_error(f"{self.metric_name}: no data from ps snapshots:\n{ps_snapshot_files_path}")
@@ -536,24 +529,20 @@ class CpuTimeAndMaxMemoryUsage:
         return True
 
 
-class Dispersion: 
+class Dispersion(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.scans_file_path = path.join(run_output_folder, "benchmark_data", "scans.csv")
         self.local_costmap_params_path = path.join(run_output_folder, "components_configuration", "navigation_stack", "navigation.yaml")
         self.run_info_path = path.join(run_output_folder, "run_info.yaml")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "dispersion"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.run_events_file_path):
@@ -625,24 +614,20 @@ class Dispersion:
         return True
 
         
-class OdometryError:
+class OdometryError(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.odometry_poses_file_path = path.join(run_output_folder, "benchmark_data", "odom.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "odometry_error"
         self.version = 2
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["odometry_error_alpha_1_mean"] = [np.nan]
@@ -796,24 +781,20 @@ class OdometryError:
         return True
 
 
-class LocalizationError:
+class LocalizationError(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.errors_plot_file_path = path.join(run_output_folder, "metric_results", "localization_errors.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "localization_update_error"
         self.version = 4
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["localization_update_absolute_translation_error_mean"] = [np.nan]
@@ -988,23 +969,19 @@ class LocalizationError:
         return True
 
 
-class CollisionlessLocalizationError:
+class CollisionlessLocalizationError(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "collisionless_localization_update_error"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         if 'collision_rate' not in self.results_df or np.isnan(self.results_df['collision_rate'].iloc[0]):
             print_error(f"{self.metric_name}: collision_rate result not found or nan")
@@ -1156,22 +1133,18 @@ class CollisionlessLocalizationError:
         return True
 
 
-class LocalizationUpdateRate:
+class LocalizationUpdateRate(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.localization_update_poses_file_path = path.join(run_output_folder, "benchmark_data", "estimated_correction_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "localization_update_rate"
         self.version = 1
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["localization_update_rate_mean"] = [np.nan]
@@ -1226,22 +1199,18 @@ class LocalizationUpdateRate:
         return True
 
 
-class MotionCharacteristics:
+class MotionCharacteristics(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "motion_characteristics"
         self.version = 4
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["average_translation_velocity"] = [np.nan]
@@ -1308,22 +1277,18 @@ class MotionCharacteristics:
         return True
 
 
-class CmdVel:
+class CmdVel(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.cmd_vel_file_path = path.join(run_output_folder, "benchmark_data", "cmd_vel.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "cmd_vel_metrics"
         self.version = 2
 
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["max_cmd_vel_translation"] = [np.nan]
@@ -1381,23 +1346,18 @@ class CmdVel:
         return True
 
 
-class NormalizedCurvature:
+class NormalizedCurvature(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "normalized_curvature"
         self.version = 2
 
-
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # check required files exist
         if not path.isfile(self.ground_truth_poses_file_path):
@@ -1440,7 +1400,7 @@ class NormalizedCurvature:
         # number of (x,y) points in the table
         sample_size = len(ground_truth_positions)
 
-        if(sample_size > 2):
+        if sample_size > 2:
             # if path has more than 2 points then consider a triplet of contiguous points (p1,p2,p3) and compute the internal angle adjacent to p2 
             for i in range(sample_size-2):
                 p1 = ground_truth_positions[i]
@@ -1456,7 +1416,7 @@ class NormalizedCurvature:
                     continue   # if for some reasons two points have 0 distance, skip computation
                 angle = np.arccos((delta_x + delta_y) / (dist_p1_p2 * dist_p2_p3))
                 # if angle is equal to pi then the path is straight, so it makes no sense to compute the curvature
-                if (angle == math.pi):
+                if angle == math.pi:
                     continue
                 curvature += angle
         
@@ -1467,14 +1427,13 @@ class NormalizedCurvature:
         return True
 
 
-class PedestrianEncounters:
+class PedestrianEncounters(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.ground_truth_poses_file_path = path.join(run_output_folder, "benchmark_data", "ground_truth_poses.csv")
         self.pedestrian_poses_file_path = path.join(run_output_folder, "benchmark_data", "pedestrian_poses.csv")
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
         self.run_info_path = path.join(run_output_folder, "run_info.yaml")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "pedestrian_encounters"
         self.version = 4
@@ -1482,12 +1441,8 @@ class PedestrianEncounters:
         self.th_low = 1.5
 
     def compute(self):
-
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df["pedestrian_encounters"] = [np.nan]
@@ -1541,11 +1496,11 @@ class PedestrianEncounters:
         try:
             pedestrian_poses_df = pd.read_csv(self.pedestrian_poses_file_path)
         except pd.errors.EmptyDataError as e:
-            print_error(f"{self.metric_name}: pedestrian_poses file is emty:\n{self.pedestrian_poses_file_path}")
+            print_error(f"{self.metric_name}: pedestrian_poses file is empty:\n{self.pedestrian_poses_file_path}")
             return False
 
         if len(pedestrian_poses_df) == 0:
-            print_info(f"{self.metric_name}: not enough pedestrian poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.odometry_poses_file_path}")
+            print_info(f"{self.metric_name}: not enough pedestrian poses in navigation interval [{navigation_start_time}, {navigation_end_time}]:\n{self.pedestrian_poses_file_path}")
             self.results_df[f"{self.metric_name}_version"] = [self.version]
             return True
 
@@ -1565,7 +1520,7 @@ class PedestrianEncounters:
             )
 
             # array holding all the distances between pedestrian_i and the robot
-            distance_array = np.sqrt( ( interpolated_df['x_robot'] - interpolated_df['x_ped'])**2 + (interpolated_df['y_robot'] - interpolated_df['y_ped'])**2 ) 
+            distance_array = np.sqrt((interpolated_df['x_robot'] - interpolated_df['x_ped'])**2 + (interpolated_df['y_robot'] - interpolated_df['y_ped'])**2 )
             
             # boolean variable representing an encounter between pedestrian_i and robot
             is_encountering = False
@@ -1582,21 +1537,18 @@ class PedestrianEncounters:
         self.results_df["pedestrian_encounters"] = [int(encounter_count)]
         return True
 
-class RealTimeFactor:
+
+class RealTimeFactor(Metric):
     def __init__(self, results_df, run_output_folder, recompute_anyway=False, verbose=True):
-        self.results_df = results_df
+        super().__init__(results_df, recompute_anyway)
         self.run_events_file_path = path.join(run_output_folder, "benchmark_data", "run_events.csv")
-        self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "real_time_factor"
         self.version = 3
-    
+
     def compute(self):
-        # Do not recompute the metric if it was already computed with the same version
-        if not self.recompute_anyway and \
-                f"{self.metric_name}_version" in self.results_df and \
-                self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version:
-            return True
+        # this condition (whether the metric needs to be computed) should be checked before executing the metric by calling this function (compute)
+        assert not (not self.recompute_anyway and f"{self.metric_name}_version" in self.results_df and self.results_df.iloc[0][f"{self.metric_name}_version"] == self.version)
 
         # clear fields in case the computation fails so that the old data (from a previous version) will be removed
         self.results_df['real_time_factor'] = [np.nan]

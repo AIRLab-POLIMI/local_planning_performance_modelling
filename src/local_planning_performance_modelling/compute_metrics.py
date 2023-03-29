@@ -7,6 +7,7 @@ import argparse
 import glob
 import multiprocessing
 import os
+import subprocess
 import sys
 import traceback
 from datetime import datetime
@@ -18,6 +19,170 @@ from yaml.constructor import ConstructorError
 
 from performance_modelling_py.utils import print_info, print_error
 from local_planning_performance_modelling.metrics import CpuTimeAndMaxMemoryUsage, TrajectoryLength, ExecutionTime, SuccessRate, OdometryError, LocalizationError, CollisionlessLocalizationError, LocalizationUpdateRate, CollisionRate, Clearance, MotionCharacteristics, CmdVel, NormalizedCurvature, PedestrianEncounters, RealTimeFactor
+
+
+def du(p):
+    """disk usage in human readable format (e.g. '2,1GB')"""
+    if path.exists(p):
+        return subprocess.check_output(['du', '-shx', p]).split()[0].decode('utf-8')
+    else:
+        return "---"
+
+
+def compress_dir(dir_path):
+    working_dir = path.dirname(dir_path)
+    compressed_file_filename = path.basename(dir_path)
+    compressed_file_filename_w_ext = f'{compressed_file_filename}.tar.xz'
+    compressed_file_path = path.join(working_dir, compressed_file_filename_w_ext)
+
+    # if the compressed file already exists, do nothing (rather than overwriting it)
+    if path.exists(compressed_file_path):
+        if compression_debug_info:
+            print_info(f"compress_dir: the compressed file already exists. Doing nothing.")
+        return
+
+    # if the directory does not exist, do nothing. This should not happen, because we already checked that the compressed file does not exist.
+    if not path.exists(dir_path):
+        print_error(f"compress_dir: neither the target directory nor the compressed file exist. DATA WAS LOST. dir_path: {dir_path}")
+        return
+
+    original_size = du(dir_path)
+    compress_cmd = ['tar', '-cJf', compressed_file_filename_w_ext, compressed_file_filename]
+
+    if compression_debug_info:
+        print_info(f"compress_dir: compressing {dir_path}: {' '.join(compress_cmd)} in {working_dir}")
+
+    subprocess.call(compress_cmd, cwd=working_dir)  # TODO and check that the compressed file is ok and that all files were compressed (for example because of an interrupt received during compression, which is likely)
+
+    if compression_debug_info:
+        print_info(f"compress_dir: {original_size} -> {du(compressed_file_path)}")
+
+
+def decompress_dir(target_dir_path):
+
+    compressed_file_path = f"{target_dir_path}.tar.xz"
+
+    # if the target dir already exists, do nothing (rather than overwriting it)
+    if path.exists(target_dir_path):
+        if compression_debug_info:
+            print_info(f"decompress_dir: the target dir already exists. Doing nothing.")
+        return
+
+    # if the compressed file does not exist, do nothing. This should not happen, because we already checked that the target dir does not exist.
+    if not path.exists(compressed_file_path):  # TODO and check that the compressed file is ok
+        print_error(f"decompress_dir: neither the target directory nor the compressed file exist. DATA WAS LOST. target_dir_path: {target_dir_path}")
+        return
+
+    working_dir = path.dirname(target_dir_path)
+    decompressed_dir_path = path.basename(target_dir_path)
+
+    original_size = du(compressed_file_path)
+    decompress_cmd = ['tar', '-xJf', compressed_file_path]
+    if compression_debug_info:
+        print_info(f"decompress_dir: decompressing {target_dir_path}: {' '.join(decompress_cmd)} in {working_dir}")
+
+    subprocess.call(decompress_cmd, cwd=working_dir)
+
+    if compression_debug_info:
+        print_info(f"decompress_dir: {original_size} -> {du(path.join(working_dir, decompressed_dir_path))}")
+
+
+def remove_non_compressed_dir(non_compressed_dir_path):
+
+    working_dir = path.dirname(non_compressed_dir_path)
+    compressed_file_filename = path.basename(non_compressed_dir_path)
+    compressed_file_filename_w_ext = f'{compressed_file_filename}.tar.xz'
+    compressed_file_path = path.join(working_dir, compressed_file_filename_w_ext)
+
+    # check if the non compressed directory (to be removed) already doesn't exists.
+    if not path.exists(non_compressed_dir_path):
+        # if the non compressed directory (to be removed) already doesn't exists, but the compress data exists, then it is ok.
+        # this happens when the data is not decompressed, because no metric needed to be computed.
+        if path.exists(compressed_file_path):  # TODO and check that the compressed file is ok
+            if compression_debug_info:
+                print_info(f"remove_non_compressed_dir: attempting to remove non compressed data, but non compressed data does not exists. It is ok because the compressed data exists.")
+        # if neither non compressed directory (to be removed) nor the compressed file exist, then there was a loss of data.
+        else:
+            print_error(f"remove_non_compressed_dir: neither the non compressed directory nor the compressed file exist. DATA WAS LOST. non_compressed_dir_path: {non_compressed_dir_path}")
+        return
+
+    # check loss of data
+    if not path.exists(compressed_file_path):  # TODO and check that the compressed file is ok
+        print_error(f"remove_non_compressed_dir: attempting to remove non compressed data, but compressed data does not exists. PREVENTING LOSS OF DATA! Missing compressed file path: {compressed_file_path}")
+        return
+
+    rm_cmd = ['trash', non_compressed_dir_path]
+
+    if compression_debug_info:
+        print_info(f"removing {non_compressed_dir_path}: {' '.join(rm_cmd)}")
+
+    subprocess.call(rm_cmd)
+
+
+def remove_compressed_file(non_compressed_dir_path):
+
+    working_dir = path.dirname(non_compressed_dir_path)
+    compressed_file_filename = path.basename(non_compressed_dir_path)
+    compressed_file_filename_w_ext = f'{compressed_file_filename}.tar.xz'
+    compressed_file_path = path.join(working_dir, compressed_file_filename_w_ext)
+
+    # check if the compressed file (to be removed) already doesn't exists.
+    if not path.exists(non_compressed_dir_path):
+        # this happens if the request is to not compress the data (which is why we are trying to delete the compressed file) and,
+        # the metrics were not computed so the data was not decompressed (which is why the non compressed directory does not exists).
+        if path.exists(compressed_file_path):  # TODO and check that the compressed file is ok
+            if compression_debug_info:
+                print_info(f"remove_compressed_file: attempting to remove compressed data, but non compressed data does not exists. non_compressed_dir_path: {non_compressed_dir_path}")
+        # if neither exist, then there was loss of data
+        else:
+            print_error(f"remove_compressed_file: neither the non compressed directory nor the compressed file exist. DATA WAS LOST. non_compressed_dir_path: {non_compressed_dir_path}")
+        return
+
+    # check that the compressed file (to be removed) exists
+    # the compressed file (to be removed) may not exist.
+    if not path.exists(compressed_file_path):
+        if compression_debug_info:
+            print_info(f"remove_compressed_file: attempting to remove compressed data, and compressed data already does not exist. Doing nothing: {non_compressed_dir_path}")
+        return
+
+    rm_cmd = ['trash', compressed_file_path]
+
+    if compression_debug_info:
+        print_info(f"removing {compressed_file_path}: {' '.join(rm_cmd)}")
+
+    subprocess.call(rm_cmd)
+
+
+def compress_run_data(run_folder):
+    compress_dir(path.join(run_folder, "benchmark_data"))
+
+
+def decompress_run_data(run_folder):
+    decompress_dir(path.join(run_folder, "benchmark_data"))
+
+
+def remove_compressed_data(run_folder):
+    remove_compressed_file(path.join(run_folder, "benchmark_data"))
+
+
+def remove_non_compressed_data(run_folder):
+    remove_non_compressed_dir(path.join(run_folder, "benchmark_data"))
+
+
+class Timer:
+    def __init__(self, name):
+        if not print_timings:
+            return
+        self.name = name
+        self.start_time = datetime.now()
+
+    def print_timing(self):
+        if print_timings:
+            print(f"{self.name:<70} {'':<20}  {datetime.now() - self.start_time}")
+
+    def print_not_computed(self):
+        if print_timings:
+            print(f"{self.name:<70} {'already computed':<20} ({datetime.now() - self.start_time})")
 
 
 def compute_run_metrics(run_output_folder):
@@ -57,28 +222,45 @@ def compute_run_metrics(run_output_folder):
         CollisionlessLocalizationError(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         LocalizationUpdateRate(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         MotionCharacteristics(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
-        CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        # CpuTimeAndMaxMemoryUsage(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         CmdVel(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         NormalizedCurvature(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
-        PedestrianEncounters(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
+        # PedestrianEncounters(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent),
         RealTimeFactor(results_df=results_df, run_output_folder=run_output_folder, recompute_anyway=recompute_all_metrics, verbose=not silent)
     ]
 
+    any_metric_needs_computation = False
+    for m in metrics_to_compute:
+        if m.needs_to_be_computed():
+            any_metric_needs_computation = True
+
+    if any_metric_needs_computation:
+        decompress_run_data(run_output_folder)
+
     success = True
     for m in metrics_to_compute:
-        if print_timings:
-            start_time = datetime.now()
-        if not m.compute():
-            success = False
-            print_error(f"compute_run_metrics: failed metrics computation for run {run_output_folder}")
-            break
+        timer = Timer(m.metric_name)
+        if m.needs_to_be_computed():
+            if not m.compute():
+                success = False
+                print_error(f"compute_run_metrics: failed metrics computation for run {run_output_folder}")
+                break
+            timer.print_timing()
         else:
-            if print_timings:
-                print(f"{m.metric_name:<200}\t{datetime.now() - start_time}")
-
+            timer.print_not_computed()
 
     # write the metrics data frame to file
     results_df.to_csv(metrics_result_file_path, index=False)
+
+    # compress the benchmark data if requested
+    if compress_benchmark_data:
+        compress_run_data(run_output_folder)
+        remove_non_compressed_data(run_output_folder)
+
+    # if data should not be compressed, remove the compressed data that may be left from previous compression requests
+    if not compress_benchmark_data:
+        remove_compressed_data(run_output_folder)
+
     return (results_df, list(run_info['run_parameters'].keys())) if success else (None, None)
 
 
@@ -122,7 +304,7 @@ def main():
     
     default_alternative_base_run_folder = path.expanduser('~/ds_alt/performance_modelling/output/local_planning/*')
     parser.add_argument('-a', dest='alternative_base_run_folder',
-                        help='Alternative folder in which the result of each run will be placed. Additionally to the base_run_folder. Defaults to {alternative_base_run_folder}.',
+                        help=f'Alternative folder in which the result of each run will be placed. Additionally to the base_run_folder. Defaults to {default_alternative_base_run_folder}.',
                         type=str,
                         default=default_alternative_base_run_folder,
                         required=False)
@@ -149,6 +331,17 @@ def main():
                         action='store_true',
                         required=False)
 
+    parser.add_argument('-c', dest='compress_benchmark_data',
+                        help='When set, the directory benchmark_data in each run directory is compressed after computing metrics.'
+                             'WARNING: If the data was previously compressed and this option is not set, the data will be left decompressed after computing the metrics. IT MAY TAKE A LOT OF SPACE ON DISK!',
+                        action='store_true',
+                        required=False)
+
+    parser.add_argument('--compression_debug_info', dest='compression_debug_info',
+                        help='When set, all information about the compression and deletion of files is printed.',
+                        action='store_true',
+                        required=False)
+
     args = parser.parse_args()
 
     if args.output_dir_path is None:
@@ -170,7 +363,6 @@ def main():
     normal_run_folders = set(glob.glob(path.expanduser(args.base_run_folder)))
     alternative_run_folders = (glob.glob(path.expanduser(args.alternative_base_run_folder)))
     all_run_folders = list(normal_run_folders.union(alternative_run_folders))
-    #print(all_run_folders)  #TODO rimuovi
 
     run_folders = sorted(list(filter(is_completed_run_folder, all_run_folders)))
     not_completed_run_folders = sorted(list(filter(is_not_completed_run_folder, glob.glob(path.expanduser(args.base_run_folder)))))
@@ -192,6 +384,10 @@ def main():
     silent = args.silent
     global print_timings
     print_timings = args.print_timings
+    global compress_benchmark_data
+    compress_benchmark_data = args.compress_benchmark_data
+    global compression_debug_info
+    compression_debug_info = args.compression_debug_info
     global recompute_all_metrics
     recompute_all_metrics = args.recompute_all_metrics
 
@@ -230,8 +426,11 @@ def main():
 
 silent = False
 print_timings = False
+compress_benchmark_data = False
+compression_debug_info = False
 recompute_all_metrics = False
 shared_progress = multiprocessing.Value('i', 0)
 shared_num_runs = multiprocessing.Value('i', 0)
+
 if __name__ == '__main__':
     main()
