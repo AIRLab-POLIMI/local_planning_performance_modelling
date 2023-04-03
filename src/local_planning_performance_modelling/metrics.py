@@ -1389,7 +1389,7 @@ class NormalizedCurvature:
         self.recompute_anyway = recompute_anyway
         self.verbose = verbose
         self.metric_name = "normalized_curvature"
-        self.version = 2
+        self.version = 4
 
 
     def compute(self):
@@ -1454,7 +1454,14 @@ class NormalizedCurvature:
                 if dist_p1_p2 == 0 or dist_p1_p2 == 0:
                     print_info(f"{self.metric_name}: retrieved a zero distance between two points.")
                     continue   # if for some reasons two points have 0 distance, skip computation
-                angle = np.arccos((delta_x + delta_y) / (dist_p1_p2 * dist_p2_p3))
+                argument = (delta_x + delta_y) / (dist_p1_p2 * dist_p2_p3)
+
+                if argument > 1: # sometimes we get values slightly higher than 1 or slightly lower than -1 due to precision issues (the reason why this is implemented is because there were values equal to 1.0000002 which caused the arcos to return a nan value)
+                    argument = argument - argument%1    # 1.02 turns into 0.99
+                if argument < -1:
+                    argument = argument + argument%1    # -1.02 turns into -0.99
+                    
+                angle = np.arccos(argument)
                 # if angle is equal to pi then the path is straight, so it makes no sense to compute the curvature
                 if (angle == math.pi):
                     continue

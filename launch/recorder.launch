@@ -5,7 +5,7 @@
     <arg name="topics" default="-a"/>
     <arg name="output" default="screen"/>
 
-	escludi pedsim 
+	 
 	<node
 	    name="$(anon recorder)"
 	    pkg="rosbag"

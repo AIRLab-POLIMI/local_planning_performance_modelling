@@ -171,9 +171,9 @@ alias ust='rosparam set use_sim_time true'
 # ROS1 execute benchmark ignore previous runs
 alias test_run='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_test.yaml --rviz --ignore-previous-runs -r ~/ds/performance_modelling/output/local_planning_test_runs'
 
-alias runs_all='rosrun local_planning_performance_modelling execute_grid_benchmark.py -a ~/ds_alt/performance_modelling/output'
+alias runs_all='rosrun local_planning_performance_modelling execute_grid_benchmark.py -a ~/ds_alt/performance_modelling/output --do-not-record'
 
-alias runs_all_2='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_all_2.yaml -a ~/ds_alt/performance_modelling/output'
+alias runs_all_2='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_all_2.yaml -a ~/ds_alt/performance_modelling/output --do-not-record'
 
 alias runs_teb='rosrun local_planning_performance_modelling execute_grid_benchmark.py -d grid_benchmark_teb.yaml -a ~/ds_alt/performance_modelling/output'
 
